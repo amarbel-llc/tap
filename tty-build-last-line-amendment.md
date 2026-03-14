@@ -133,13 +133,14 @@ harness sees it as a comment and ignores its content.
 ### Interaction with Streamed Output
 
 When both `streamed-output` and `tty-build-last-line` are active, the
-trailing line is distinct from streamed output comment lines. Streamed
-output lines are emitted sequentially and associated with test points;
-the trailing line is a single line that is rewritten in place and has
-no association with any test point.
+trailing line is distinct from YAML diagnostic block content. YAML
+`output` field lines are delivered incrementally within their block and
+are associated with a specific test point; the trailing line is a
+single comment line that is rewritten in place and has no association
+with any test point.
 
-Producers SHOULD ensure the trailing line remains below all streamed
-output lines.
+Producers SHOULD ensure the trailing line remains below all YAML
+diagnostic block content.
 
 ### Interaction with Subtests
 

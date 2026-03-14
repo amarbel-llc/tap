@@ -9,23 +9,25 @@ title: "TAP-14 Amendment: Streamed Output"
 
 ## Problem
 
-TAP-14 captures process output exclusively in YAML diagnostic blocks,
-which are emitted after a test point completes. This makes output
-invisible to consumers until the entire test finishes. For long-running
-tests, build steps, or interactive CI environments, users have no
-standard way to observe output in real time.
+TAP-14 captures process output in YAML diagnostic blocks, which are
+emitted after a test point completes. Harnesses traditionally buffer
+the entire YAML block — waiting for the closing `...` marker — before
+displaying any content. For long-running tests, build steps, or
+interactive CI environments, this means output is invisible until the
+test finishes.
 
 Common workarounds include sending output to stderr (losing association
 with test points) or emitting ad-hoc `#` comment lines (which harnesses
-treat as unstructured noise). Neither approach gives harnesses enough
-information to associate streamed output with the test point it belongs
-to.
+treat as unstructured noise). Neither approach preserves the structured
+association between output and test points that YAML diagnostics
+provide.
 
 ## Solution
 
-Define a new pragma, `streamed-output`, that tells harnesses to treat
-comment lines between test points as structured output belonging to the
-next test point.
+Define a new pragma, `streamed-output`, that tells harnesses to display
+lines of a YAML diagnostic block's `output` field incrementally as they
+are written, rather than buffering the entire block until the closing
+`...` marker.
 
 ## Specification
 
@@ -38,70 +40,90 @@ pragma +streamed-output
 ```
 
 This pragma is document-wide. Once set, it applies to all subsequent
-test points in the document. Producers _must not_ deactivate it with
-`pragma -streamed-output` after activating it.
+YAML diagnostic blocks in the document. Producers _must not_ deactivate
+it with `pragma -streamed-output` after activating it.
 
-### Streamed Output Lines
+### Incremental Output Delivery
 
-When `streamed-output` is active, any comment line (a line beginning
-with `#` preceded by zero or more whitespace characters) that appears
-between two test points is a **streamed output line**. Its content is
-the text following the `# ` prefix (hash, space).
+When `streamed-output` is active, producers _may_ flush individual
+lines of a YAML block scalar value as they become available, rather
+than buffering the entire block. This applies specifically to the
+`output` field (and any field that represents captured process output,
+such as `stderr`).
 
-Streamed output lines are associated with the **next** test point. That
-is, all comment lines after test point N (or after the plan, if before
-any test points) and before test point N+1 are the streamed output of
-test point N+1.
+Producers _must_ ensure that each flushed line is a valid continuation
+of the YAML block scalar — that is, it maintains the correct
+indentation level established by the block scalar indicator (`|` or
+`>`).
+
+The YAML block remains structurally valid TAP-14. The `---` marker
+opens the block, the `...` marker closes it, and all content between
+them is valid YAML 1.2. The pragma changes only the expected delivery
+timing, not the format.
+
+### Harness Behavior
+
+When `streamed-output` is active, harnesses _should_ display each line
+of the `output` field as it arrives rather than waiting for the `...`
+marker. This enables real-time observation of test output in terminal
+and CI environments.
+
+Harnesses _must_ still parse the complete YAML block for diagnostic
+data after the `...` marker is received. Incremental display is a
+presentation concern and does not affect how harnesses interpret the
+diagnostic data.
+
+Harnesses that do not support incremental display _may_ continue to
+buffer the entire block. The resulting output is identical — only the
+timing of display differs.
 
 ### Example
+
+A build step that compiles, then runs tests. The `output` field's
+content is flushed line-by-line as the build progresses:
 
 ```tap
 TAP version 14
 pragma +streamed-output
-1..3
-# compiling main.rs
-# linking binary
+1..2
 ok 1 - build
-# running test suite
-# FAIL: test_parse expected 42 got 41
+  ---
+  output: |
+    compiling main.rs
+    compiling lib.rs
+    linking binary
+  ...
 not ok 2 - test
   ---
   message: "test_parse assertion failed"
   severity: fail
   exitcode: 1
+  output: |
+    running test suite
+    FAIL: test_parse expected 42 got 41
   ...
-# deploying to staging
-ok 3 - deploy
 ```
 
-In this example:
+Without the pragma, a harness would display nothing until `...` closes
+each block. With the pragma active, a harness displays each line of the
+`output` value as the producer writes it — `compiling main.rs` appears
+immediately, `compiling lib.rs` follows as it happens, and so on.
 
-- `compiling main.rs` and `linking binary` are streamed output for test
-  point 1 (`build`)
-- `running test suite` and `FAIL: test_parse expected 42 got 41` are
-  streamed output for test point 2 (`test`)
-- `deploying to staging` is streamed output for test point 3 (`deploy`)
+### Non-Output Fields
 
-### Relationship to YAML Diagnostics
-
-Producers _may_ omit the YAML `output` field when `streamed-output` is
-active, since the output has already been delivered via comment lines.
-
-Producers _may_ include the YAML `output` field for backwards
-compatibility with harnesses that do not recognize the pragma. In this
-case the YAML block contains the complete buffered output, and the
-streamed comment lines are the same content delivered incrementally.
+The incremental delivery guarantee applies only to fields representing
+captured process output (`output`, `stderr`, and similar). Harnesses
+_should not_ attempt to incrementally display structured diagnostic
+fields such as `message`, `severity`, `exitcode`, `file`, or `line`,
+which are typically short values written atomically.
 
 ### Backwards Compatibility
 
 Harnesses that do not recognize the `streamed-output` pragma _must_
-ignore it, per the TAP-14 specification's pragma rules. Comment lines
-are already valid TAP and will be treated as normal comments. This
-provides graceful degradation: the output is still visible as comments,
-just without the semantic association to test points.
-
-Producers targeting maximum compatibility _should_ include both streamed
-comment lines and YAML `output` fields.
+ignore it, per the TAP-14 specification's pragma rules. The YAML
+diagnostic block is structurally identical with or without the pragma —
+it is valid TAP-14 in both cases. The only difference is whether the
+harness displays output lines as they arrive or after the block closes.
 
 ### Subtests
 
@@ -113,13 +135,22 @@ A parent document's `streamed-output` pragma does not automatically
 apply to child subtests. Subtests that want streamed output _must_ emit
 their own `pragma +streamed-output`.
 
+### Interaction with ANSI in YAML Output Blocks
+
+When both `streamed-output` and the ANSI in YAML Output Blocks
+amendment are in effect, incrementally delivered `output` lines _may_
+contain ANSI SGR sequences, subject to the same rules defined by that
+amendment (SGR only, TTY-gated, `NO_COLOR` respected). Harnesses that
+display output lines incrementally _should_ pass through SGR sequences
+when writing to a terminal and strip them when writing to a
+non-terminal, exactly as they would for a fully buffered YAML block.
+
 ### Future Extensions
 
-This amendment defines only unstructured text lines prefixed with `# `.
-Future amendments _may_ define structured prefixes to distinguish output
-streams (e.g., stdout vs stderr) or attach metadata to individual output
-lines. Harnesses _should not_ assume any structure beyond the `# `
-prefix defined here.
+Future amendments _may_ define conventions for distinguishing output
+streams (e.g., separate `stdout` and `stderr` fields) or for signaling
+progress metadata within the output. Harnesses _should not_ assume any
+semantics beyond what is defined here.
 
 ## Authors
 

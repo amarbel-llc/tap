@@ -139,6 +139,29 @@ Harnesses that do not recognize the `streamed-output` pragma will see the
 body lines as non-TAP (ignored or passed through per TAP-14). The correlated
 test point is parsed normally. This provides graceful degradation.
 
+### Empty Output Block as Progress Indicator
+
+An Output Block with an empty body (header followed immediately by the
+correlated test point) is valid. This is the RECOMMENDED way for producers to
+signal that a test point has started, enabling harnesses to display in-progress
+indicators for test points that have no streaming output.
+
+``` tap
+# Output: 1 - lint
+ok 1 - lint
+```
+
+When a harness sees the `# Output:` header, it MAY display an in-progress marker
+for the test point. When the correlated test point arrives, the harness replaces
+the marker with the resolved status.
+
+Producers that want in-progress display for every test point SHOULD emit an
+`# Output:` header before each test point, even when the test point produces no
+output. This is preferable to introducing a separate "started" directive because
+it reuses existing Output Block semantics and degrades gracefully --- harnesses
+that do not support Output Blocks see an ordinary comment followed by a normal
+test point.
+
 ### Interaction with YAML Diagnostics
 
 The Output Block and YAML diagnostic blocks serve complementary roles:
@@ -171,6 +194,28 @@ rules for comment lines: producers MUST NOT include ANSI sequences in the
 header.
 
 ### Interaction with Subtests
+
+Output Blocks and subtests are **mutually exclusive per test point**. A test
+point MUST NOT have both an Output Block (`# Output:`) and a subtest
+(`# Subtest:`) header. The two serve different purposes:
+
+- **`# Subtest: <name>`** introduces a nested TAP document. The indented body is
+  parsed as TAP: it contains a plan, test points, YAML diagnostic blocks, and
+  may itself contain further subtests or Output Blocks. Use this when a test
+  point has structured sub-results.
+
+- **`# Output: <id> - <desc>`** introduces an opaque output stream. The indented
+  body is plain text, not parsed as TAP. Use this when a test point has
+  unstructured process output.
+
+There is no ambiguity between the two because their headers have distinct
+formats: `# Subtest:` carries a name (or nothing), while `# Output:` carries a
+numeric test point ID. Harnesses MUST reject a test point that is preceded by
+both an `# Output:` header and a `# Subtest:` header at the same indentation
+level.
+
+Both patterns nest freely within subtests --- a subtest's children MAY
+individually use either `# Subtest:` or `# Output:`.
 
 In a subtest, `pragma +streamed-output` applies only to that subtest's document,
 consistent with TAP-14's rule that subtest pragmas do not affect parent document

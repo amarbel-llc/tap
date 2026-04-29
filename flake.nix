@@ -106,6 +106,43 @@
             tap-dancer-bash
           ];
         };
+
+        # Filter zz-tests_bats so the hermetic-tests store path only
+        # changes when actual test inputs change — not on unrelated
+        # repo edits.
+        tests-src = pkgs.lib.cleanSourceWith {
+          src = ./zz-tests_bats;
+          filter =
+            path: type:
+            let
+              bn = builtins.baseNameOf path;
+            in
+            type == "directory" || pkgs.lib.hasSuffix ".bats" bn || bn == "common.bash";
+        };
+
+        # Hermetic bats suite, wired to `nix flake check`. Inherits
+        # nothing from the host PATH and runs against the freshly built
+        # tap-dancer-cli — so a regression in the emitter (caught by
+        # the in-suite `tap-dancer validate` calls) fails the check.
+        hermetic-tests =
+          pkgs.runCommandLocal "tap-dancer-tests"
+            {
+              nativeBuildInputs = [
+                pkgs.bats
+                tap-dancer-cli
+                pkgs.coreutils
+              ];
+            }
+            ''
+              cd ${tests-src}
+              export TAP_DANCER_BIN=${tap-dancer-cli}/bin/tap-dancer
+              export BATS_LIB_PATH=${pkgs.bats.libraries.bats-support}/share/bats:${pkgs.bats.libraries.bats-assert}/share/bats
+              export TMPDIR=/tmp
+              export HOME="$TMPDIR/home"
+              mkdir -p "$HOME"
+              bats --tap .
+              touch $out
+            '';
       in
       {
         packages = {
@@ -116,6 +153,10 @@
             tap-dancer-rust
             tap-dancer-bash
             ;
+        };
+
+        checks = {
+          tap-tests = hermetic-tests;
         };
 
         devShells.default = pkgs-master.mkShell {

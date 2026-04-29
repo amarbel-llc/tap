@@ -1,0 +1,14 @@
+result
+result-*
+.direnv/
+.tmp/
+
+# Go
+/go/vendor/
+
+# Rust
+/rust/target/
+
+# Editor / OS
+*.swp
+.DS_Store

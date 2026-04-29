@@ -1,7 +1,7 @@
 ---
 name: TAP-14 Output
 description: This skill should be used when the user asks to "format output as TAP", "add TAP output", "produce TAP-14", "write TAP test results", "use tap-dancer", or mentions TAP-14, TAP version 14, TAP output format, TAP writer, or test result formatting.
-version: 0.2.0
+version: 0.1.1
 ---
 
 # TAP-14 Output with tap-dancer

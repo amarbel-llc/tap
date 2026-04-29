@@ -54,7 +54,7 @@
 
         version = "0.2.0";
 
-        tap-dancer-cli = pkgs.buildGoApplication {
+        tap-dancer-go = pkgs.buildGoApplication {
           pname = "tap-dancer";
           inherit version;
           src = ./go;
@@ -101,7 +101,7 @@
         tap-dancer = pkgs.symlinkJoin {
           name = "tap-dancer";
           paths = [
-            tap-dancer-cli
+            tap-dancer-go
             tap-dancer-rust
             tap-dancer-bash
           ];
@@ -122,20 +122,20 @@
 
         # Hermetic bats suite, wired to `nix flake check`. Inherits
         # nothing from the host PATH and runs against the freshly built
-        # tap-dancer-cli — so a regression in the emitter (caught by
+        # tap-dancer-go — so a regression in the emitter (caught by
         # the in-suite `tap-dancer validate` calls) fails the check.
         hermetic-tests =
           pkgs.runCommandLocal "tap-dancer-tests"
             {
               nativeBuildInputs = [
                 pkgs.bats
-                tap-dancer-cli
+                tap-dancer-go
                 pkgs.coreutils
               ];
             }
             ''
               cd ${tests-src}
-              export TAP_DANCER_BIN=${tap-dancer-cli}/bin/tap-dancer
+              export TAP_DANCER_BIN=${tap-dancer-go}/bin/tap-dancer
               export BATS_LIB_PATH=${pkgs.bats.libraries.bats-support}/share/bats:${pkgs.bats.libraries.bats-assert}/share/bats
               export TMPDIR=/tmp
               export HOME="$TMPDIR/home"
@@ -149,7 +149,7 @@
           default = tap-dancer;
           inherit
             tap-dancer
-            tap-dancer-cli
+            tap-dancer-go
             tap-dancer-rust
             tap-dancer-bash
             ;

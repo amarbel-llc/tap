@@ -7,7 +7,7 @@ build:
     nix build
 
 build-cli:
-    nix build .#tap-dancer-cli
+    nix build .#tap-dancer-go
 
 build-rust:
     nix build .#tap-dancer-rust

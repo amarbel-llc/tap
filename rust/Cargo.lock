@@ -233,7 +233,7 @@ dependencies = [
 
 [[package]]
 name = "tap-dancer"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "fixed_decimal",
  "icu_decimal",

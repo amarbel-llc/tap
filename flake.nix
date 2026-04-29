@@ -52,7 +52,10 @@
         rustToolchain = pkgs-rust.rust-bin.stable.latest.default;
         craneLib = (crane.mkLib pkgs-rust).overrideToolchain rustToolchain;
 
-        version = "0.2.0";
+        # Single source of truth for the project version. version.env is a
+        # shell-style file (`VERSION=X.Y.Z`) so the release recipe can
+        # `source` it and Nix can parse it without an extra dependency.
+        version = builtins.elemAt (builtins.match "^VERSION=([^\n]+)\n?$" (builtins.readFile ./version.env)) 0;
 
         tap-dancer-go = pkgs.buildGoApplication {
           pname = "tap-dancer";
@@ -179,6 +182,9 @@
 
             pkgs.just
             pkgs.nixfmt-rfc-style
+
+            # Used by the `release` recipe.
+            pkgs.gh
           ];
           BATS_LIB_PATH = "${pkgs.bats.libraries.bats-support}/share/bats:${pkgs.bats.libraries.bats-assert}/share/bats";
           GOTOOLCHAIN = "local";

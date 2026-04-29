@@ -43,3 +43,49 @@ update:
 
 clean:
     rm -rf result result-*
+
+# Cut a release: bump version everywhere, run tests, tag, push, and create a
+# GitHub release. Usage: just release 0.3.0
+#
+# Refuses to run if:
+#   - the version arg is not semver (X.Y.Z, optionally with -prerelease)
+#   - the working tree is dirty
+#   - the tag already exists locally
+#   - HEAD does not contain origin/master (would push un-merged work)
+release version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! "{{version}}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
+      echo "release: version must be semver (X.Y.Z[-prerelease]), got: {{version}}" >&2
+      exit 1
+    fi
+    tag="v{{version}}"
+
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+      echo "release: working tree is dirty; commit or stash first" >&2
+      exit 1
+    fi
+    if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
+      echo "release: tag $tag already exists locally" >&2
+      exit 1
+    fi
+    git fetch --quiet origin master
+    if ! git merge-base --is-ancestor origin/master HEAD; then
+      echo "release: HEAD does not contain origin/master; rebase first" >&2
+      exit 1
+    fi
+
+    echo "VERSION={{version}}" > version.env
+    sed -i -E 's/^version = "[^"]+"$/version = "{{version}}"/' rust/Cargo.toml
+    sed -i -E 's/^version: .+$/version: {{version}}/' skills/tap14/SKILL.md
+
+    just test
+
+    git add version.env rust/Cargo.toml rust/Cargo.lock skills/tap14/SKILL.md
+    git commit -m "release: $tag"
+    git tag -s "$tag" -m "$tag"
+
+    git push origin HEAD:refs/heads/master
+    git push origin "$tag"
+
+    {{cmd_nix_dev}} gh release create "$tag" --generate-notes --title "$tag"

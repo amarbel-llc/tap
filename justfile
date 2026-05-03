@@ -60,6 +60,10 @@ release version:
       exit 1
     fi
     tag="v{{version}}"
+    # Subpath-prefixed tag for the Go module at go/. Required so
+    # `go get github.com/amarbel-llc/tap/go@latest` resolves to a real
+    # semver instead of a v0.0.0-<date>-<sha> pseudo-version.
+    go_tag="go/$tag"
 
     if ! git diff --quiet || ! git diff --cached --quiet; then
       echo "release: working tree is dirty; commit or stash first" >&2
@@ -67,6 +71,10 @@ release version:
     fi
     if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
       echo "release: tag $tag already exists locally" >&2
+      exit 1
+    fi
+    if git rev-parse --verify --quiet "refs/tags/$go_tag" >/dev/null; then
+      echo "release: tag $go_tag already exists locally" >&2
       exit 1
     fi
     git fetch --quiet origin master
@@ -84,8 +92,9 @@ release version:
     git add version.env rust/Cargo.toml rust/Cargo.lock skills/tap14/SKILL.md
     git commit -m "release: $tag"
     git tag -s "$tag" -m "$tag"
+    git tag -s "$go_tag" -m "$go_tag"
 
     git push origin HEAD:refs/heads/master
-    git push origin "$tag"
+    git push origin "$tag" "$go_tag"
 
     {{cmd_nix_dev}} gh release create "$tag" --generate-notes --title "$tag"

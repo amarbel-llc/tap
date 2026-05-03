@@ -131,20 +131,75 @@ func ConvertExecParallel(results <-chan ExecResult, w io.Writer, verbose bool, c
 	exitCode := 0
 
 	for r := range results {
-		if r.ExitCode == 0 {
-			if verbose {
-				tw.OkDiag(r.Command, execResultDiagnostics(r))
-			} else {
-				tw.Ok(r.Command)
-			}
-		} else {
+		if !emitExecResult(tw, r, verbose) {
 			exitCode = 1
-			tw.NotOk(r.Command, execResultDiagnosticsMap(r))
 		}
 	}
 
 	tw.Plan()
 	return exitCode
+}
+
+// isInnerTAP reports whether the captured stdout begins with a TAP-14 version
+// line, indicating the wrapped command produced a TAP stream that should be
+// re-emitted as a subtest rather than crammed into a YAML diagnostic.
+// Leading blank lines are tolerated.
+func isInnerTAP(stdout []byte) bool {
+	for _, line := range bytes.Split(stdout, []byte("\n")) {
+		trimmed := bytes.TrimSpace(line)
+		if len(trimmed) == 0 {
+			continue
+		}
+		return string(trimmed) == "TAP version 14"
+	}
+	return false
+}
+
+// emitExecResult writes one ExecResult through tw. If r.Stdout is itself a
+// TAP-14 stream, it is replayed as a subtest under r.Command; otherwise the
+// existing diagnostic-blob path is used. Returns true if the test point passed
+// (no inner failures and command exit code 0 for the TAP-pass-through path,
+// or exit code 0 for the legacy path).
+func emitExecResult(tw *Writer, r ExecResult, verbose bool) bool {
+	if isInnerTAP(r.Stdout) {
+		return emitInnerTAPSubtest(tw, r)
+	}
+	if r.ExitCode == 0 {
+		if verbose {
+			tw.OkDiag(r.Command, execResultDiagnostics(r))
+		} else {
+			tw.Ok(r.Command)
+		}
+		return true
+	}
+	tw.NotOk(r.Command, execResultDiagnosticsMap(r))
+	return false
+}
+
+// emitInnerTAPSubtest replays r.Stdout as a child subtest of tw and emits the
+// outer test point. The outer test fails if any inner test point failed or
+// the wrapped command exited non-zero.
+func emitInnerTAPSubtest(tw *Writer, r ExecResult) bool {
+	child := tw.Subtest(r.Command)
+	summary, _ := Replay(bytes.NewReader(r.Stdout), child)
+	child.Plan() // idempotent: no-op if Replay already triggered one
+
+	innerFailed := summary.Failed > 0 || child.HasFailures()
+	cmdFailed := r.ExitCode != 0
+	if !innerFailed && !cmdFailed {
+		tw.Ok(r.Command)
+		return true
+	}
+
+	// Stdout is now first-class TAP in the subtest, so omit it from the outer
+	// diagnostics. Keep exit code and stderr (which may carry the wrapper's
+	// own error message, e.g. "Recipe `test` failed on line 8").
+	diag := map[string]string{"exit-code": fmt.Sprintf("%d", r.ExitCode)}
+	if stderr := strings.TrimRight(string(r.Stderr), "\n"); stderr != "" {
+		diag["stderr"] = stderr
+	}
+	tw.NotOk(r.Command, diag)
+	return false
 }
 
 // ConvertExecParallelWithStatus runs commands via the executor and writes TAP-14
@@ -347,16 +402,7 @@ func runWithStatusLine(ctx context.Context, tw *Writer, spinner *statusSpinner, 
 	stopTicker()
 	tw.FinishLastLine()
 
-	if r.ExitCode == 0 {
-		if verbose {
-			tw.OkDiag(r.Command, execResultDiagnostics(r))
-		} else {
-			tw.Ok(r.Command)
-		}
-		return true
-	}
-	tw.NotOk(r.Command, execResultDiagnosticsMap(r))
-	return false
+	return emitExecResult(tw, r, verbose)
 }
 
 func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecutor, template string, args []string, w io.Writer, verbose bool, color bool, cfg execConfig) int {
@@ -389,15 +435,8 @@ func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecut
 		tw.FinishLastLine()
 		completed++
 
-		if r.ExitCode == 0 {
-			if verbose {
-				tw.OkDiag(r.Command, execResultDiagnostics(r))
-			} else {
-				tw.Ok(r.Command)
-			}
-		} else {
+		if !emitExecResult(tw, r, verbose) {
 			exitCode = 1
-			tw.NotOk(r.Command, execResultDiagnosticsMap(r))
 		}
 
 		renderParallel()

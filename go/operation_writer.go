@@ -35,7 +35,7 @@ func (ow *OperationWriter) BeginOperation(depth int, op *operation.OperationEven
 	} else {
 		parent := &ow.levels[idx-1]
 		parent.hasChildren = true
-		child := parent.writer.Subtest(parent.description)
+		child := parent.writer.Subtest("%s", parent.description)
 		ow.levels = append(ow.levels, opLevel{
 			writer:      child,
 			description: op.Description,

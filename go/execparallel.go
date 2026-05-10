@@ -180,7 +180,7 @@ func emitExecResult(tw *Writer, r ExecResult, verbose bool) bool {
 // outer test point. The outer test fails if any inner test point failed or
 // the wrapped command exited non-zero.
 func emitInnerTAPSubtest(tw *Writer, r ExecResult) bool {
-	child := tw.Subtest(r.Command)
+	child := tw.Subtest("%s", r.Command)
 	summary, _ := Replay(bytes.NewReader(r.Stdout), child)
 	child.Plan() // idempotent: no-op if Replay already triggered one
 
@@ -451,8 +451,8 @@ func execParallelWithRunningCount(ctx context.Context, executor *GoroutineExecut
 
 func parallelStatusLine(running, done, total int, color bool) string {
 	if color {
-		return fmt.Sprintf("%s%d running%s [%d/%d done]",
-			ansiYellow, running, ansiReset,
+		return fmt.Sprintf("%s [%d/%d done]",
+			yellowStyle.Render(fmt.Sprintf("%d running", running)),
 			done, total)
 	}
 	return fmt.Sprintf("%d running [%d/%d done]", running, done, total)

@@ -7,16 +7,22 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 )
 
-// ANSI color codes for TTY output.
-const (
-	ansiGreen  = "\033[32m"
-	ansiRed    = "\033[31m"
-	ansiYellow = "\033[33m"
-	ansiReset  = "\033[0m"
+var colorRenderer = func() *lipgloss.Renderer {
+	r := lipgloss.NewRenderer(io.Discard)
+	r.SetColorProfile(termenv.ANSI)
+	return r
+}()
+
+var (
+	greenStyle  = colorRenderer.NewStyle().Foreground(lipgloss.Color("2"))
+	redStyle    = colorRenderer.NewStyle().Foreground(lipgloss.Color("1"))
+	yellowStyle = colorRenderer.NewStyle().Foreground(lipgloss.Color("3"))
 )
 
 type Writer struct {
@@ -62,35 +68,35 @@ func (tw *Writer) formatNumber(n int) string {
 
 func (tw *Writer) colorOk() string {
 	if tw.color {
-		return ansiGreen + "ok" + ansiReset
+		return greenStyle.Render("ok")
 	}
 	return "ok"
 }
 
 func (tw *Writer) colorNotOk() string {
 	if tw.color {
-		return ansiRed + "not ok" + ansiReset
+		return redStyle.Render("not ok")
 	}
 	return "not ok"
 }
 
 func (tw *Writer) colorSkip() string {
 	if tw.color {
-		return ansiYellow + "# SKIP" + ansiReset
+		return yellowStyle.Render("# SKIP")
 	}
 	return "# SKIP"
 }
 
 func (tw *Writer) colorTodo() string {
 	if tw.color {
-		return ansiYellow + "# TODO" + ansiReset
+		return yellowStyle.Render("# TODO")
 	}
 	return "# TODO"
 }
 
 func (tw *Writer) colorBailOut() string {
 	if tw.color {
-		return ansiRed + "Bail out!" + ansiReset
+		return redStyle.Render("Bail out!")
 	}
 	return "Bail out!"
 }
@@ -114,6 +120,7 @@ func (tw *Writer) HasFailures() bool {
 	return tw.failed
 }
 
+// TODO clean this function up
 func (tw *Writer) NotOk(description string, diagnostics map[string]string) int {
 	tw.n++
 	tw.failed = true
@@ -181,12 +188,12 @@ func (tw *Writer) Plan() {
 	fmt.Fprintf(tw.w, "1..%s\n", tw.formatNumber(tw.n))
 }
 
-func (tw *Writer) BailOut(reason string) {
-	fmt.Fprintf(tw.w, "%s %s\n", tw.colorBailOut(), reason)
+func (tw *Writer) BailOut(format string, args ...any) {
+	fmt.Fprintf(tw.w, "%s %s\n", tw.colorBailOut(), fmt.Sprintf(format, args...))
 }
 
-func (tw *Writer) Comment(text string) {
-	fmt.Fprintf(tw.w, "# %s\n", text)
+func (tw *Writer) Comment(format string, args ...any) {
+	fmt.Fprintf(tw.w, "# %s\n", fmt.Sprintf(format, args...))
 }
 
 func (tw *Writer) Pragma(key string, enabled bool) {
@@ -334,6 +341,7 @@ func writeDiagnostics(w io.Writer, d *Diagnostics, color bool) {
 	fmt.Fprintln(w, "  ...")
 }
 
+// what is this used for?
 type indentWriter struct {
 	w      io.Writer
 	prefix string
@@ -353,9 +361,9 @@ func (iw *indentWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (tw *Writer) Subtest(name string) *Writer {
+func (tw *Writer) Subtest(format string, args ...any) *Writer {
 	prefix := "    "
-	fmt.Fprintf(tw.w, "%s# Subtest: %s\n", prefix, name)
+	fmt.Fprintf(tw.w, "%s# Subtest: %s\n", prefix, fmt.Sprintf(format, args...))
 	iw := &indentWriter{w: tw.w, prefix: prefix}
 	child := &Writer{
 		w:       iw,
@@ -389,7 +397,7 @@ func (tw *Writer) WriteAll(tests iter.Seq[TestPoint]) {
 		if tp.OutputBlock != nil {
 			tw.OutputBlock(tp.Description, tp.OutputBlock)
 		} else if tp.Subtests != nil {
-			child := tw.Subtest(tp.Description)
+			child := tw.Subtest("%s", tp.Description)
 			tp.Subtests(child)
 			if !child.planEmitted {
 				child.Plan()

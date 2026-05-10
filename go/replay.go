@@ -75,7 +75,7 @@ func Replay(r io.Reader, tw *Writer) (Summary, error) {
 
 		case EventComment:
 			flushBuffered()
-			tw.Comment(ev.Comment)
+			tw.Comment("%s", ev.Comment)
 
 		case EventBailOut:
 			flushBuffered()
@@ -83,7 +83,7 @@ func Replay(r io.Reader, tw *Writer) (Summary, error) {
 			if ev.BailOut != nil {
 				reason = ev.BailOut.Reason
 			}
-			tw.BailOut(reason)
+			tw.BailOut("%s", reason)
 			summary.BailedOut = true
 		}
 	}

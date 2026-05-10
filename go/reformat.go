@@ -6,6 +6,8 @@ import (
 	"io"
 	"regexp"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 var (
@@ -33,35 +35,35 @@ func ReformatTAP(r io.Reader, w io.Writer, color bool) {
 
 		if m := notOkLine.FindStringSubmatchIndex(line); m != nil {
 			rest := line[m[4]:m[5]]
-			rest = colorizeDirective(rest, todoDir, "# TODO", color, ansiYellow)
-			fmt.Fprintf(w, "%s%s\n", colorToken("not ok", color, ansiRed), rest)
+			rest = colorizeDirective(rest, todoDir, "# TODO", color, yellowStyle)
+			fmt.Fprintf(w, "%s%s\n", colorToken("not ok", color, redStyle), rest)
 		} else if m := okLine.FindStringSubmatchIndex(line); m != nil {
 			rest := line[m[4]:m[5]]
-			rest = colorizeDirective(rest, skipDir, "# SKIP", color, ansiYellow)
-			fmt.Fprintf(w, "%s%s\n", colorToken("ok", color, ansiGreen), rest)
+			rest = colorizeDirective(rest, skipDir, "# SKIP", color, yellowStyle)
+			fmt.Fprintf(w, "%s%s\n", colorToken("ok", color, greenStyle), rest)
 		} else if m := bailOutLine.FindStringSubmatchIndex(line); m != nil {
 			rest := line[m[4]:m[5]]
-			fmt.Fprintf(w, "%s%s\n", colorToken("Bail out!", color, ansiRed), rest)
+			fmt.Fprintf(w, "%s%s\n", colorToken("Bail out!", color, redStyle), rest)
 		} else {
 			fmt.Fprintln(w, line)
 		}
 	}
 }
 
-func colorToken(token string, color bool, code string) string {
+func colorToken(token string, color bool, style lipgloss.Style) string {
 	if color {
-		return code + token + ansiReset
+		return style.Render(token)
 	}
 	return token
 }
 
-func colorizeDirective(rest string, pattern *regexp.Regexp, canonical string, color bool, code string) string {
+func colorizeDirective(rest string, pattern *regexp.Regexp, canonical string, color bool, style lipgloss.Style) string {
 	loc := pattern.FindStringIndex(rest)
 	if loc == nil {
 		return rest
 	}
 	before := rest[:loc[0]]
 	after := rest[loc[1]:]
-	directive := colorToken(canonical, color, code)
+	directive := colorToken(canonical, color, style)
 	return before + directive + after
 }

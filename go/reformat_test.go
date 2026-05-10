@@ -30,7 +30,7 @@ func TestReformatTAPColorizesOk(t *testing.T) {
 	input := "ok 1 - pass\n"
 	var buf bytes.Buffer
 	ReformatTAP(strings.NewReader(input), &buf, true)
-	expected := ansiGreen + "ok" + ansiReset + " 1 - pass\n"
+	expected := greenStyle.Render("ok") + " 1 - pass\n"
 	if !strings.Contains(buf.String(), expected) {
 		t.Errorf("expected colorized ok line %q, got:\n%s", expected, buf.String())
 	}
@@ -40,7 +40,7 @@ func TestReformatTAPColorizesNotOk(t *testing.T) {
 	input := "not ok 1 - fail\n"
 	var buf bytes.Buffer
 	ReformatTAP(strings.NewReader(input), &buf, true)
-	expected := ansiRed + "not ok" + ansiReset + " 1 - fail\n"
+	expected := redStyle.Render("not ok") + " 1 - fail\n"
 	if !strings.Contains(buf.String(), expected) {
 		t.Errorf("expected colorized not ok line %q, got:\n%s", expected, buf.String())
 	}
@@ -51,7 +51,7 @@ func TestReformatTAPNormalizesAndColorizesSkip(t *testing.T) {
 	var buf bytes.Buffer
 	ReformatTAP(strings.NewReader(input), &buf, true)
 	out := buf.String()
-	if !strings.Contains(out, ansiYellow+"# SKIP"+ansiReset) {
+	if !strings.Contains(out, yellowStyle.Render("# SKIP")) {
 		t.Errorf("expected colorized # SKIP, got:\n%s", out)
 	}
 	if strings.Contains(out, "# skip") {
@@ -73,7 +73,7 @@ func TestReformatTAPColorizesTodo(t *testing.T) {
 	input := "not ok 1 - todo # TODO not implemented\n"
 	var buf bytes.Buffer
 	ReformatTAP(strings.NewReader(input), &buf, true)
-	if !strings.Contains(buf.String(), ansiYellow+"# TODO"+ansiReset) {
+	if !strings.Contains(buf.String(), yellowStyle.Render("# TODO")) {
 		t.Errorf("expected colorized # TODO, got:\n%s", buf.String())
 	}
 }
@@ -82,7 +82,7 @@ func TestReformatTAPColorizesBailOut(t *testing.T) {
 	input := "Bail out! database down\n"
 	var buf bytes.Buffer
 	ReformatTAP(strings.NewReader(input), &buf, true)
-	expected := ansiRed + "Bail out!" + ansiReset + " database down\n"
+	expected := redStyle.Render("Bail out!") + " database down\n"
 	if !strings.Contains(buf.String(), expected) {
 		t.Errorf("expected colorized bail out %q, got:\n%s", expected, buf.String())
 	}

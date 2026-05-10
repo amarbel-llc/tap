@@ -166,7 +166,7 @@ func handleGoTest(ctx context.Context, args json.RawMessage) error {
 
 	if err := cmd.Start(); err != nil {
 		tw := tap.NewColorWriter(os.Stdout, color)
-		tw.BailOut(fmt.Sprintf("failed to start go test: %v", err))
+		tw.BailOut("failed to start go test: %v", err)
 		return err
 	}
 
@@ -220,7 +220,7 @@ func handleCargoTest(ctx context.Context, args json.RawMessage) error {
 
 	if err := cmd.Start(); err != nil {
 		tw := tap.NewColorWriter(os.Stdout, color)
-		tw.BailOut(fmt.Sprintf("failed to start cargo test: %v", err))
+		tw.BailOut("failed to start cargo test: %v", err)
 		return err
 	}
 
@@ -235,7 +235,7 @@ func handleCargoTest(ctx context.Context, args json.RawMessage) error {
 		if msg == "" {
 			msg = cmdErr.Error()
 		}
-		tw.BailOut(fmt.Sprintf("cargo test failed: %s", msg))
+		tw.BailOut("cargo test failed: %s", msg)
 		os.Exit(1)
 	}
 

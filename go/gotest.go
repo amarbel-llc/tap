@@ -65,7 +65,7 @@ func ConvertGoTest(r io.Reader, w io.Writer, verbose bool, skipEmpty bool, color
 			if err == io.EOF {
 				break
 			}
-			tw.Comment(fmt.Sprintf("unparseable: %v", err))
+			tw.Comment("unparseable: %v", err)
 			continue
 		}
 
@@ -165,7 +165,7 @@ func emptyPackageReason(output string) string {
 }
 
 func emitPackage(tapWriter *Writer, pkg *packageResult, verbose bool) {
-	subtest := tapWriter.Subtest(pkg.name)
+	subtest := tapWriter.Subtest("%s", pkg.name)
 
 	for _, testResult := range pkg.tests {
 		// Skip subtests -- they are emitted by their parent
@@ -196,7 +196,7 @@ func emitTest(tapWriter *Writer, pkg *packageResult, testRezult *testResult, ver
 	}
 
 	if len(children) > 0 {
-		sub := tapWriter.Subtest(testRezult.name)
+		sub := tapWriter.Subtest("%s", testRezult.name)
 		for _, child := range children {
 			emitTest(sub, pkg, child, verbose)
 		}

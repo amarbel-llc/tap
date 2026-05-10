@@ -195,7 +195,7 @@ func emitCargoSuite(tw *Writer, suite *cargoSuiteResult, verbose bool, skipEmpty
 		return
 	}
 
-	sub := tw.Subtest(suite.name)
+	sub := tw.Subtest("%s", suite.name)
 	for _, tr := range suite.tests {
 		emitCargoTest(sub, tr, verbose)
 	}

@@ -17,13 +17,13 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
 
-	"github.com/amarbel-llc/tap/go/pkgs/diagnostic"
-	"github.com/amarbel-llc/tap/go/pkgs/reformat"
-	"github.com/amarbel-llc/tap/go/pkgs/reader"
-	"github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/tap/go/pkgs/cargotest"
+	"github.com/amarbel-llc/tap/go/pkgs/diagnostic"
+	"github.com/amarbel-llc/tap/go/pkgs/exec_parallel"
 	"github.com/amarbel-llc/tap/go/pkgs/gotest"
-	"github.com/amarbel-llc/tap/go/pkgs/execparallel"
+	"github.com/amarbel-llc/tap/go/pkgs/reader"
+	"github.com/amarbel-llc/tap/go/pkgs/reformat"
+	"github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 
 func main() {
@@ -406,7 +406,7 @@ func handleExec(ctx context.Context, args json.RawMessage) error {
 	execArgs := cliArgs[1:]
 
 	color := stdoutIsTerminal()
-	exitCode := execparallel.ConvertExec(ctx, utility, execArgs, os.Stdout, *verbose, color, execparallel.WithSpinner(!*noSpinner))
+	exitCode := exec_parallel.ConvertExec(ctx, utility, execArgs, os.Stdout, *verbose, color, exec_parallel.WithSpinner(!*noSpinner))
 
 	if exitCode != 0 {
 		os.Exit(exitCode)
@@ -460,14 +460,14 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 	}
 
 	color := stdoutIsTerminal()
-	executor := &execparallel.GoroutineExecutor{MaxJobs: *maxJobs}
+	executor := &exec_parallel.GoroutineExecutor{MaxJobs: *maxJobs}
 
 	var exitCode int
 	if color {
-		exitCode = execparallel.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, os.Stdout, *verbose, color, execparallel.WithSpinner(!*noSpinner))
+		exitCode = exec_parallel.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, os.Stdout, *verbose, color, exec_parallel.WithSpinner(!*noSpinner))
 	} else {
 		results := executor.Run(ctx, template, execArgs)
-		exitCode = execparallel.ConvertExecParallel(results, os.Stdout, *verbose, color)
+		exitCode = exec_parallel.ConvertExecParallel(results, os.Stdout, *verbose, color)
 	}
 
 	if exitCode != 0 {

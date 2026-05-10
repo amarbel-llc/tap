@@ -1,4 +1,4 @@
-package execparallel
+package exec_parallel
 
 //go:generate dagnabit export
 

@@ -13,10 +13,17 @@ import (
 	"os/signal"
 	"strings"
 
-	tap "github.com/amarbel-llc/tap/go"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
+
+	"github.com/amarbel-llc/tap/go/pkgs/diagnostic"
+	"github.com/amarbel-llc/tap/go/pkgs/reformat"
+	"github.com/amarbel-llc/tap/go/pkgs/reader"
+	"github.com/amarbel-llc/tap/go/pkgs/writer"
+	"github.com/amarbel-llc/tap/go/pkgs/cargotest"
+	"github.com/amarbel-llc/tap/go/pkgs/gotest"
+	"github.com/amarbel-llc/tap/go/pkgs/execparallel"
 )
 
 func main() {
@@ -165,12 +172,12 @@ func handleGoTest(ctx context.Context, args json.RawMessage) error {
 	color := stdoutIsTerminal()
 
 	if err := cmd.Start(); err != nil {
-		tw := tap.NewColorWriter(os.Stdout, color)
+		tw := writer.NewColorWriter(os.Stdout, color)
 		tw.BailOut("failed to start go test: %v", err)
 		return err
 	}
 
-	exitCode := tap.ConvertGoTest(stdout, os.Stdout, *verbose, *skipEmpty, color)
+	exitCode := gotest.ConvertGoTest(stdout, os.Stdout, *verbose, *skipEmpty, color)
 
 	// Wait for command to finish (ignore error — we use our own exit code)
 	cmd.Wait()
@@ -219,18 +226,18 @@ func handleCargoTest(ctx context.Context, args json.RawMessage) error {
 	color := stdoutIsTerminal()
 
 	if err := cmd.Start(); err != nil {
-		tw := tap.NewColorWriter(os.Stdout, color)
+		tw := writer.NewColorWriter(os.Stdout, color)
 		tw.BailOut("failed to start cargo test: %v", err)
 		return err
 	}
 
-	exitCode := tap.ConvertCargoTest(stdout, os.Stdout, *verbose, *skipEmpty, color)
+	exitCode := cargotest.ConvertCargoTest(stdout, os.Stdout, *verbose, *skipEmpty, color)
 
 	cmdErr := cmd.Wait()
 
 	// If cargo failed and we got no test output, it's a build failure.
 	if cmdErr != nil && exitCode == 0 {
-		tw := tap.NewColorWriter(os.Stdout, color)
+		tw := writer.NewColorWriter(os.Stdout, color)
 		msg := strings.TrimSpace(stderrBuf.String())
 		if msg == "" {
 			msg = cmdErr.Error()
@@ -295,9 +302,9 @@ func handleValidate(ctx context.Context, args json.RawMessage, _ command.Prompte
 	}
 
 	// Parse and validate
-	reader := tap.NewReader(input)
-	diags := reader.Diagnostics()
-	summary := reader.Summary()
+	rd := reader.NewReader(input)
+	diags := rd.Diagnostics()
+	summary := rd.Summary()
 
 	// Format output
 	switch params.Format {
@@ -313,12 +320,12 @@ func handleValidate(ctx context.Context, args json.RawMessage, _ command.Prompte
 	case "tap":
 		// Output validation results as TAP
 		var sb strings.Builder
-		tw := tap.NewWriter(&sb)
+		tw := writer.NewWriter(&sb)
 
 		// One test per diagnostic
 		for _, d := range diags {
 			desc := fmt.Sprintf("[%s] %s", d.Rule, d.Message)
-			if d.Severity == tap.SeverityError {
+			if d.Severity == diagnostic.SeverityError {
 				tw.NotOk(desc, map[string]string{
 					"line":     fmt.Sprintf("%d", d.Line),
 					"severity": d.Severity.String(),
@@ -370,7 +377,7 @@ func handleValidate(ctx context.Context, args json.RawMessage, _ command.Prompte
 }
 
 func handleReformat(_ context.Context, _ json.RawMessage) error {
-	tap.ReformatTAP(os.Stdin, os.Stdout, stdoutIsTerminal())
+	reformat.ReformatTAP(os.Stdin, os.Stdout, stdoutIsTerminal())
 	return nil
 }
 
@@ -399,7 +406,7 @@ func handleExec(ctx context.Context, args json.RawMessage) error {
 	execArgs := cliArgs[1:]
 
 	color := stdoutIsTerminal()
-	exitCode := tap.ConvertExec(ctx, utility, execArgs, os.Stdout, *verbose, color, tap.WithSpinner(!*noSpinner))
+	exitCode := execparallel.ConvertExec(ctx, utility, execArgs, os.Stdout, *verbose, color, execparallel.WithSpinner(!*noSpinner))
 
 	if exitCode != 0 {
 		os.Exit(exitCode)
@@ -453,14 +460,14 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 	}
 
 	color := stdoutIsTerminal()
-	executor := &tap.GoroutineExecutor{MaxJobs: *maxJobs}
+	executor := &execparallel.GoroutineExecutor{MaxJobs: *maxJobs}
 
 	var exitCode int
 	if color {
-		exitCode = tap.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, os.Stdout, *verbose, color, tap.WithSpinner(!*noSpinner))
+		exitCode = execparallel.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, os.Stdout, *verbose, color, execparallel.WithSpinner(!*noSpinner))
 	} else {
 		results := executor.Run(ctx, template, execArgs)
-		exitCode = tap.ConvertExecParallel(results, os.Stdout, *verbose, color)
+		exitCode = execparallel.ConvertExecParallel(results, os.Stdout, *verbose, color)
 	}
 
 	if exitCode != 0 {

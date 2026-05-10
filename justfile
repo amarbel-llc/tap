@@ -28,6 +28,19 @@ test-bats: build-cli
     TAP_DANCER_BIN=$PWD/result/bin/tap-dancer \
       {{cmd_nix_dev}} bats zz-tests_bats/
 
+# Run the bats suite as a nix derivation (`bats-default` lane). Same
+# code path `nix flake check` exercises — staged, hermetic, runs
+# against a freshly built tap-dancer. Slower than `test-bats` but
+# proves a clean rebuild still passes the suite.
+test-bats-default:
+    nix build .#bats-default --print-build-logs --no-link
+
+# Run a tag-filtered bats lane. Lanes are auto-generated from
+# `# bats file_tags=` directives in zz-tests_bats/*.bats; `nix flake
+# show` lists what's currently available.
+test-bats-tags *tags:
+    nix build --print-build-logs --no-link .#bats-{{tags}}
+
 fmt:
     {{cmd_nix_dev}} bash -c 'cd go && gofumpt -w .'
     {{cmd_nix_dev}} bash -c 'cd rust && cargo fmt'

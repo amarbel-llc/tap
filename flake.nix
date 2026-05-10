@@ -23,6 +23,18 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # bats helper libraries (bats-support, bats-assert, …) bundled as
+    # `bats-libs` with a `batsLibPath` passthru. Used both by the
+    # devShell's `BATS_LIB_PATH` and by the nix-driven `bats-*` lanes
+    # in `bats.nix`. Note: amarbel-llc/bats has a `tap` input, but its
+    # `bats-libs` output does not consume it — no circular dependency.
+    bats = {
+      url = "github:amarbel-llc/bats";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.utils.follows = "utils";
+    };
   };
 
   outputs =
@@ -34,6 +46,7 @@
       gomod2nix,
       crane,
       rust-overlay,
+      bats,
     }:
     utils.lib.eachDefaultSystem (
       system:
@@ -110,9 +123,10 @@
           ];
         };
 
-        # Filter zz-tests_bats so the hermetic-tests store path only
-        # changes when actual test inputs change — not on unrelated
-        # repo edits.
+        # Filter zz-tests_bats so bats-lane store paths only change
+        # when actual test inputs change — not on unrelated repo
+        # edits. The local `justfile` is excluded; lanes invoke bats
+        # directly, not through `just`.
         tests-src = pkgs.lib.cleanSourceWith {
           src = ./zz-tests_bats;
           filter =
@@ -123,29 +137,15 @@
             type == "directory" || pkgs.lib.hasSuffix ".bats" bn || bn == "common.bash";
         };
 
-        # Hermetic bats suite, wired to `nix flake check`. Inherits
-        # nothing from the host PATH and runs against the freshly built
-        # tap-dancer-go — so a regression in the emitter (caught by
-        # the in-suite `tap-dancer validate` calls) fails the check.
-        hermetic-tests =
-          pkgs.runCommandLocal "tap-dancer-tests"
-            {
-              nativeBuildInputs = [
-                pkgs.bats
-                tap-dancer-go
-                pkgs.coreutils
-              ];
-            }
-            ''
-              cd ${tests-src}
-              export TAP_DANCER_BIN=${tap-dancer-go}/bin/tap-dancer
-              export BATS_LIB_PATH=${pkgs.bats.libraries.bats-support}/share/bats:${pkgs.bats.libraries.bats-assert}/share/bats
-              export TMPDIR=/tmp
-              export HOME="$TMPDIR/home"
-              mkdir -p "$HOME"
-              bats --tap .
-              touch $out
-            '';
+        bats-libs = bats.packages.${system}.bats-libs;
+
+        # Per-tag bats lane outputs (`bats-default`, plus `bats-${tag}`
+        # for every `# bats file_tags=` directive found in zz-tests_bats).
+        # See bats.nix for the auto-discovery rules.
+        batsLib = import ./bats.nix {
+          inherit pkgs bats-libs tap-dancer-go;
+          batsSrc = tests-src;
+        };
       in
       {
         packages = {
@@ -156,10 +156,11 @@
             tap-dancer-rust
             tap-dancer-bash
             ;
-        };
+        }
+        // batsLib.batsLaneOutputs;
 
         checks = {
-          tap-tests = hermetic-tests;
+          tap-tests = batsLib.batsLaneOutputs.bats-default;
         };
 
         devShells.default = pkgs-master.mkShell {
@@ -186,7 +187,7 @@
             # Used by the `release` recipe.
             pkgs.gh
           ];
-          BATS_LIB_PATH = "${pkgs.bats.libraries.bats-support}/share/bats:${pkgs.bats.libraries.bats-assert}/share/bats";
+          BATS_LIB_PATH = bats-libs.batsLibPath;
           GOTOOLCHAIN = "local";
         };
       }

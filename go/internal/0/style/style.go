@@ -1,7 +1,5 @@
 package style
 
-//go:generate dagnabit export
-
 import (
 	"io"
 

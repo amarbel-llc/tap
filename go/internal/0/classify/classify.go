@@ -1,7 +1,5 @@
 package classify
 
-//go:generate dagnabit export
-
 import (
 	"regexp"
 	"strings"

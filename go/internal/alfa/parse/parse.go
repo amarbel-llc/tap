@@ -1,7 +1,5 @@
 package parse
 
-//go:generate dagnabit export
-
 import (
 	"fmt"
 	"strconv"

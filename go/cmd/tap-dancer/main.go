@@ -529,6 +529,7 @@ func handleFormatNDJSON(_ context.Context, args json.RawMessage) error {
 		}
 	} else {
 		var passW io.Writer
+		passOutPath := ""
 		if *passOut != "" {
 			f, err := os.Create(*passOut)
 			if err != nil {
@@ -537,8 +538,15 @@ func handleFormatNDJSON(_ context.Context, args json.RawMessage) error {
 			}
 			defer f.Close()
 			passW = f
+			passOutPath = *passOut
 		}
 		if err := ndjson.WriteSplit(os.Stdout, passW, out); err != nil {
+			// os.Exit does not run deferred functions, so the deferred
+			// f.Close() above is skipped. Remove the partial file
+			// explicitly so callers do not read truncated content.
+			if passOutPath != "" {
+				os.Remove(passOutPath)
+			}
 			fmt.Fprintf(os.Stderr, "error writing ndjson: %v\n", err)
 			os.Exit(2)
 		}

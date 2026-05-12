@@ -187,3 +187,42 @@ func TestAggregatorBuffersOutputBlock(t *testing.T) {
 		t.Errorf("output = %q, want %q", *out.Records[0].Output, want)
 	}
 }
+
+func TestAggregatorEmbedsSubtest(t *testing.T) {
+	events := []diagnostic.Event{
+		{Type: diagnostic.EventVersion, Line: 1, Depth: 0},
+		{Type: diagnostic.EventPlan, Line: 2, Depth: 0, Plan: &diagnostic.PlanResult{Count: 1}},
+		// Subtest body at depth 1
+		{Type: diagnostic.EventTestPoint, Line: 3, Depth: 1, TestPoint: &diagnostic.TestPointResult{Number: 1, Description: "child a", OK: true}},
+		{Type: diagnostic.EventTestPoint, Line: 4, Depth: 1, TestPoint: &diagnostic.TestPointResult{Number: 2, Description: "child b", OK: false}},
+		{Type: diagnostic.EventPlan, Line: 5, Depth: 1, Plan: &diagnostic.PlanResult{Count: 2}},
+		// Parent test point at depth 0
+		{Type: diagnostic.EventTestPoint, Line: 6, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 1, Description: "parent", OK: false}},
+	}
+
+	agg := NewAggregator()
+	for _, ev := range events {
+		agg.Consume(ev)
+	}
+	out := agg.Finalize(nil, nil)
+
+	if len(out.Records) != 1 {
+		t.Fatalf("expected 1 top-level record, got %d", len(out.Records))
+	}
+	parent := out.Records[0]
+	if parent.Description != "parent" || parent.OK {
+		t.Errorf("parent record = %+v", parent)
+	}
+	if len(parent.Subtest) != 2 {
+		t.Fatalf("expected 2 subtest children, got %d", len(parent.Subtest))
+	}
+	if parent.Subtest[0].Description != "child a" || !parent.Subtest[0].OK {
+		t.Errorf("child 0 = %+v", parent.Subtest[0])
+	}
+	if parent.Subtest[1].Description != "child b" || parent.Subtest[1].OK {
+		t.Errorf("child 1 = %+v", parent.Subtest[1])
+	}
+	if out.Summary.Total != 1 {
+		t.Errorf("summary.Total = %d, want 1 (subtests do not count toward total)", out.Summary.Total)
+	}
+}

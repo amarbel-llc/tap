@@ -60,12 +60,16 @@ type SummaryDiagnostic struct {
 //
 // Call Consume for each event in order. Call Finalize once after
 // the stream is exhausted (typically at io.EOF from the reader).
+//
+// v1 limitation: subtests deeper than depth 1 collapse into the
+// depth-1 children slice; a follow-up issue tracks proper recursion.
 type Aggregator struct {
-	records       []TestRecord
-	planCount     int
-	bailed        bool
-	bailout       *BailoutRecord
-	pendingOutput *string // accumulating Output Block body for the next top-level test point
+	records         []TestRecord
+	planCount       int
+	bailed          bool
+	bailout         *BailoutRecord
+	pendingOutput   *string      // accumulating Output Block body for the next top-level test point
+	pendingChildren []TestRecord // children seen at depth > 0 before parent test point arrives
 }
 
 // Output is the result of finalizing an aggregator.
@@ -88,14 +92,23 @@ func (a *Aggregator) Consume(ev diagnostic.Event) {
 			a.planCount = ev.Plan.Count
 		}
 	case diagnostic.EventTestPoint:
-		if ev.Depth == 0 && ev.TestPoint != nil {
-			rec := buildTestRecord(ev)
-			if a.pendingOutput != nil {
-				rec.Output = a.pendingOutput
-				a.pendingOutput = nil
-			}
-			a.records = append(a.records, rec)
+		if ev.TestPoint == nil {
+			return
 		}
+		if ev.Depth > 0 {
+			a.pendingChildren = append(a.pendingChildren, buildTestRecord(ev))
+			return
+		}
+		rec := buildTestRecord(ev)
+		if a.pendingOutput != nil {
+			rec.Output = a.pendingOutput
+			a.pendingOutput = nil
+		}
+		if len(a.pendingChildren) > 0 {
+			rec.Subtest = a.pendingChildren
+			a.pendingChildren = nil
+		}
+		a.records = append(a.records, rec)
 	case diagnostic.EventYAMLDiagnostic:
 		if ev.Depth == 0 && len(a.records) > 0 {
 			a.records[len(a.records)-1].Diagnostic = copyMap(ev.YAML)

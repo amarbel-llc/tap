@@ -90,7 +90,22 @@ func (a *Aggregator) Consume(ev diagnostic.Event) {
 		if ev.Depth == 0 && ev.TestPoint != nil {
 			a.records = append(a.records, buildTestRecord(ev))
 		}
+	case diagnostic.EventYAMLDiagnostic:
+		if ev.Depth == 0 && len(a.records) > 0 {
+			a.records[len(a.records)-1].Diagnostic = copyMap(ev.YAML)
+		}
 	}
+}
+
+func copyMap(m map[string]string) map[string]string {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 // Finalize computes the aggregate summary and returns the full Output.

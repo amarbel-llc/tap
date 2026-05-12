@@ -133,3 +133,29 @@ func TestAggregatorRoutesOkAndNotOk(t *testing.T) {
 		t.Errorf("expected valid")
 	}
 }
+
+func TestAggregatorAttachesYAMLDiagnostic(t *testing.T) {
+	events := []diagnostic.Event{
+		{Type: diagnostic.EventVersion, Line: 1, Depth: 0},
+		{Type: diagnostic.EventPlan, Line: 2, Depth: 0, Plan: &diagnostic.PlanResult{Count: 1}},
+		{Type: diagnostic.EventTestPoint, Line: 3, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 1, Description: "fail", OK: false}},
+		{Type: diagnostic.EventYAMLDiagnostic, Line: 6, Depth: 0, YAML: map[string]string{"message": "broken", "severity": "fail"}},
+	}
+
+	agg := NewAggregator()
+	for _, ev := range events {
+		agg.Consume(ev)
+	}
+	out := agg.Finalize(nil, nil)
+
+	if len(out.Records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(out.Records))
+	}
+	got := out.Records[0].Diagnostic
+	if got["message"] != "broken" {
+		t.Errorf("diagnostic message = %q, want %q", got["message"], "broken")
+	}
+	if got["severity"] != "fail" {
+		t.Errorf("diagnostic severity = %q", got["severity"])
+	}
+}

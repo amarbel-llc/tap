@@ -122,6 +122,13 @@ func (a *Aggregator) Consume(ev diagnostic.Event) {
 		if ev.Depth == 0 && a.pendingOutput != nil {
 			*a.pendingOutput += ev.OutputLine + "\n"
 		}
+	case diagnostic.EventBailOut:
+		a.bailed = true
+		msg := ""
+		if ev.BailOut != nil {
+			msg = ev.BailOut.Reason
+		}
+		a.bailout = &BailoutRecord{Type: "bailout", Message: msg, Line: ev.Line}
 	}
 }
 

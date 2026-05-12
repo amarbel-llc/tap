@@ -226,3 +226,28 @@ func TestAggregatorEmbedsSubtest(t *testing.T) {
 		t.Errorf("summary.Total = %d, want 1 (subtests do not count toward total)", out.Summary.Total)
 	}
 }
+
+func TestAggregatorRecordsBailout(t *testing.T) {
+	events := []diagnostic.Event{
+		{Type: diagnostic.EventVersion, Line: 1},
+		{Type: diagnostic.EventPlan, Line: 2, Plan: &diagnostic.PlanResult{Count: 3}},
+		{Type: diagnostic.EventTestPoint, Line: 3, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 1, OK: true}},
+		{Type: diagnostic.EventBailOut, Line: 4, Depth: 0, BailOut: &diagnostic.BailOutResult{Reason: "database unreachable"}},
+	}
+
+	agg := NewAggregator()
+	for _, ev := range events {
+		agg.Consume(ev)
+	}
+	out := agg.Finalize(nil, nil)
+
+	if out.Bailout == nil {
+		t.Fatal("expected bailout record")
+	}
+	if out.Bailout.Message != "database unreachable" || out.Bailout.Line != 4 {
+		t.Errorf("bailout = %+v", out.Bailout)
+	}
+	if !out.Summary.Bailed {
+		t.Error("expected summary.Bailed = true")
+	}
+}

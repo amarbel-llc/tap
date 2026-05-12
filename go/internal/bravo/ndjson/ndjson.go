@@ -2,6 +2,8 @@
 // conforming to docs/rfcs/0001-test-result-ndjson-schema.md.
 package ndjson
 
+import "github.com/amarbel-llc/tap/go/internal/0/diagnostic"
+
 //go:generate dagnabit export
 
 // TestRecord is one top-level test point with its full context.
@@ -52,4 +54,106 @@ type SummaryDiagnostic struct {
 	Severity string `json:"severity"`
 	Rule     string `json:"rule"`
 	Message  string `json:"message"`
+}
+
+// Aggregator builds NDJSON records from reader events.
+//
+// Call Consume for each event in order. Call Finalize once after
+// the stream is exhausted (typically at io.EOF from the reader).
+type Aggregator struct {
+	records   []TestRecord
+	planCount int
+	bailed    bool
+	bailout   *BailoutRecord
+}
+
+// Output is the result of finalizing an aggregator.
+type Output struct {
+	Records []TestRecord
+	Bailout *BailoutRecord
+	Summary SummaryRecord
+}
+
+// NewAggregator constructs an empty Aggregator ready to consume events.
+func NewAggregator() *Aggregator {
+	return &Aggregator{}
+}
+
+// Consume feeds a single reader event into the aggregator.
+func (a *Aggregator) Consume(ev diagnostic.Event) {
+	switch ev.Type {
+	case diagnostic.EventPlan:
+		if ev.Depth == 0 && ev.Plan != nil {
+			a.planCount = ev.Plan.Count
+		}
+	case diagnostic.EventTestPoint:
+		if ev.Depth == 0 && ev.TestPoint != nil {
+			a.records = append(a.records, buildTestRecord(ev))
+		}
+	}
+}
+
+// Finalize computes the aggregate summary and returns the full Output.
+// readerDiags and readerSummary come from reader.Reader's Diagnostics()
+// and Summary() methods; both may be nil for synthetic streams.
+func (a *Aggregator) Finalize(readerDiags []diagnostic.Diagnostic, readerSummary *diagnostic.Summary) Output {
+	summary := SummaryRecord{
+		Type:        "summary",
+		PlanCount:   a.planCount,
+		Diagnostics: []SummaryDiagnostic{},
+	}
+
+	for _, r := range a.records {
+		summary.Total++
+		switch {
+		case r.Directive != nil && r.Directive.Kind == "skip":
+			summary.Skipped++
+		case r.Directive != nil && r.Directive.Kind == "todo":
+			summary.Todo++
+		case r.OK:
+			summary.Passed++
+		default:
+			summary.Failed++
+		}
+	}
+
+	for _, d := range readerDiags {
+		summary.Diagnostics = append(summary.Diagnostics, SummaryDiagnostic{
+			Line:     d.Line,
+			Severity: d.Severity.String(),
+			Rule:     d.Rule,
+			Message:  d.Message,
+		})
+	}
+
+	summary.Bailed = a.bailed
+	if readerSummary != nil {
+		summary.Valid = readerSummary.Valid
+	} else {
+		summary.Valid = len(readerDiags) == 0
+	}
+
+	return Output{
+		Records: a.records,
+		Bailout: a.bailout,
+		Summary: summary,
+	}
+}
+
+func buildTestRecord(ev diagnostic.Event) TestRecord {
+	tp := ev.TestPoint
+	rec := TestRecord{
+		Type:        "test",
+		N:           tp.Number,
+		Description: tp.Description,
+		OK:          tp.OK,
+		Line:        ev.Line,
+	}
+	switch tp.Directive {
+	case diagnostic.DirectiveSkip:
+		rec.Directive = &DirectiveValue{Kind: "skip", Reason: tp.Reason}
+	case diagnostic.DirectiveTodo:
+		rec.Directive = &DirectiveValue{Kind: "todo", Reason: tp.Reason}
+	}
+	return rec
 }

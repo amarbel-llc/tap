@@ -14,7 +14,7 @@ teardown() {
 
 function format_ndjson_emits_one_record_per_test { # @test
   local input=$'TAP version 14\n1..2\nok 1 - a\nnot ok 2 - b\n'
-  run bash -c "echo '$input' | $tap_dancer format-ndjson"
+  run bash -c "printf '%s' '$input' | $tap_dancer format-ndjson"
   # 2 test records + 1 summary = 3 lines
   local count=$(echo "$output" | wc -l)
   [ "$count" -eq 3 ]

@@ -245,15 +245,17 @@ func WriteSplit(failOut, passOut io.Writer, out Output) error {
 	}
 
 	for _, rec := range out.Records {
-		if rec.OK {
+		// Failure stream gets only genuine failures: !ok && directive == nil.
+		// SKIP and TODO directives route to the pass stream regardless of ok.
+		if !rec.OK && rec.Directive == nil {
+			if err := failEnc.Encode(rec); err != nil {
+				return err
+			}
+		} else {
 			if passEnc != nil {
 				if err := passEnc.Encode(rec); err != nil {
 					return err
 				}
-			}
-		} else {
-			if err := failEnc.Encode(rec); err != nil {
-				return err
 			}
 		}
 	}

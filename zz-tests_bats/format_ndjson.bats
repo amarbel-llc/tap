@@ -51,6 +51,22 @@ function format_ndjson_split_routes_by_verdict { # @test
   assert_output "1"
 }
 
+function format_ndjson_split_routes_todo_to_passes { # @test
+  local passfile="$BATS_TEST_TMPDIR/pass.ndjson"
+  local failfile="$BATS_TEST_TMPDIR/fail.ndjson"
+  local input=$'TAP version 14\n1..3\nok 1 - pass\nnot ok 2 - real failure\nnot ok 3 - try harder # TODO not yet implemented\n'
+  printf '%s' "$input" \
+    | "$tap_dancer" format-ndjson --split --pass-out "$passfile" > "$failfile" || true
+
+  # Failure stream: only the genuine failure (n=2) + summary
+  run jq -r 'select(.type == "test") | .n' "$failfile"
+  assert_output "2"
+
+  # Pass stream: pass (n=1) and TODO (n=3) + summary
+  run jq -rs '[.[] | select(.type == "test") | .n] | sort | @csv' "$passfile"
+  assert_output "1,3"
+}
+
 function format_ndjson_split_without_pass_out_drops_passes { # @test
   run bash -c "printf 'TAP version 14\n1..2\nok 1 - a\nnot ok 2 - b\n' | $tap_dancer format-ndjson --split"
   # Should contain only the failing record + summary

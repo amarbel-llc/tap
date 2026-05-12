@@ -308,6 +308,93 @@ func TestWriteSplitRoutesByOK(t *testing.T) {
 	}
 }
 
+func TestWriteSplitRoutesSkipToPassStream(t *testing.T) {
+	// A `# SKIP` record has ok:true and a skip directive. It should go to passes.
+	rec := TestRecord{
+		Type:        "test",
+		N:           1,
+		Description: "skipped",
+		OK:          true,
+		Directive:   &DirectiveValue{Kind: "skip", Reason: "not implemented"},
+		Line:        1,
+	}
+	out := Output{
+		Records: []TestRecord{rec},
+		Summary: SummaryRecord{Type: "summary", Skipped: 1, Total: 1, Diagnostics: []SummaryDiagnostic{}},
+	}
+
+	var failBuf, passBuf bytes.Buffer
+	if err := WriteSplit(&failBuf, &passBuf, out); err != nil {
+		t.Fatalf("WriteSplit: %v", err)
+	}
+
+	if !bytes.Contains(passBuf.Bytes(), []byte("\"n\":1")) {
+		t.Errorf("pass stream missing skip record: %s", passBuf.String())
+	}
+	if bytes.Contains(failBuf.Bytes(), []byte("\"n\":1")) {
+		t.Errorf("failure stream wrongly includes skip record: %s", failBuf.String())
+	}
+}
+
+func TestWriteSplitRoutesTodoToPassStream(t *testing.T) {
+	// A `# TODO` record typically has ok:false and a todo directive. It should
+	// go to the pass stream (NOT the failure stream) — TODOs are not genuine
+	// failures.
+	rec := TestRecord{
+		Type:        "test",
+		N:           1,
+		Description: "todo work",
+		OK:          false,
+		Directive:   &DirectiveValue{Kind: "todo", Reason: "not yet implemented"},
+		Line:        1,
+	}
+	out := Output{
+		Records: []TestRecord{rec},
+		Summary: SummaryRecord{Type: "summary", Todo: 1, Total: 1, Diagnostics: []SummaryDiagnostic{}},
+	}
+
+	var failBuf, passBuf bytes.Buffer
+	if err := WriteSplit(&failBuf, &passBuf, out); err != nil {
+		t.Fatalf("WriteSplit: %v", err)
+	}
+
+	if !bytes.Contains(passBuf.Bytes(), []byte("\"n\":1")) {
+		t.Errorf("pass stream missing todo record: %s", passBuf.String())
+	}
+	if bytes.Contains(failBuf.Bytes(), []byte("\"n\":1")) {
+		t.Errorf("failure stream wrongly includes todo record: %s", failBuf.String())
+	}
+}
+
+func TestWriteSplitRoutesFailureToFailStream(t *testing.T) {
+	// A plain not-ok record with no directive is a genuine failure and goes
+	// to the failure stream.
+	rec := TestRecord{
+		Type:        "test",
+		N:           1,
+		Description: "real failure",
+		OK:          false,
+		Directive:   nil,
+		Line:        1,
+	}
+	out := Output{
+		Records: []TestRecord{rec},
+		Summary: SummaryRecord{Type: "summary", Failed: 1, Total: 1, Diagnostics: []SummaryDiagnostic{}},
+	}
+
+	var failBuf, passBuf bytes.Buffer
+	if err := WriteSplit(&failBuf, &passBuf, out); err != nil {
+		t.Fatalf("WriteSplit: %v", err)
+	}
+
+	if !bytes.Contains(failBuf.Bytes(), []byte("\"n\":1")) {
+		t.Errorf("failure stream missing failure record: %s", failBuf.String())
+	}
+	if bytes.Contains(passBuf.Bytes(), []byte("\"n\":1")) {
+		t.Errorf("pass stream wrongly includes failure record: %s", passBuf.String())
+	}
+}
+
 func TestWriteSplitNilPassOut(t *testing.T) {
 	rec1 := TestRecord{Type: "test", N: 1, OK: true, Line: 1}
 	rec2 := TestRecord{Type: "test", N: 2, OK: false, Line: 2}

@@ -68,10 +68,13 @@ request/response model and is omitted.
 
 ## Routing rules
 
-**Whole-subtree by parent verdict.** A top-level test point's `ok` field
-decides which stream gets it; the embedded `subtest` array goes with it
-regardless of children's verdicts. An NDJSON record is never split
-across streams.
+**Whole-subtree by parent verdict.** A top-level test point routes to
+the failure stream only when it is a *genuine* failure: `!ok &&
+directive == nil`. All other records --- ok:true passes, SKIPs (any
+ok), and TODOs (`ok:false` per TAP convention) --- route to the pass
+stream. The embedded `subtest` array goes with the parent regardless
+of children's verdicts. An NDJSON record is never split across
+streams.
 
 **Shared records.** Bail-out and summary records are emitted to both
 streams.

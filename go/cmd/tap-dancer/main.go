@@ -21,6 +21,7 @@ import (
 	"github.com/amarbel-llc/tap/go/pkgs/diagnostic"
 	"github.com/amarbel-llc/tap/go/pkgs/exec_parallel"
 	"github.com/amarbel-llc/tap/go/pkgs/gotest"
+	"github.com/amarbel-llc/tap/go/pkgs/ndjson"
 	"github.com/amarbel-llc/tap/go/pkgs/reader"
 	"github.com/amarbel-llc/tap/go/pkgs/reformat"
 	"github.com/amarbel-llc/tap/go/pkgs/writer"
@@ -38,6 +39,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  reformat              Read TAP from stdin and emit TAP-14 with ANSI colors\n")
 		fmt.Fprintf(os.Stderr, "  exec <cmd> [args...]  Run cmd for each arg sequentially and emit TAP-14\n")
 		fmt.Fprintf(os.Stderr, "  exec-parallel         Run commands in parallel and emit TAP-14\n")
+		fmt.Fprintf(os.Stderr, "  format-ndjson         Read TAP from stdin and emit NDJSON records\n")
 		fmt.Fprintf(os.Stderr, "  generate-plugin DIR   Generate MCP plugin (for Nix postInstall)\n")
 		fmt.Fprintf(os.Stderr, "\nWhen run with no args and no TTY, starts MCP server mode\n")
 	}
@@ -134,6 +136,13 @@ func registerCommands() *command.App {
 		Description:     command.Description{Short: "Run commands in parallel and emit TAP-14 test points"},
 		PassthroughArgs: true,
 		RunCLI:          handleExecParallel,
+	})
+
+	app.AddCommand(&command.Command{
+		Name:            "format-ndjson",
+		Description:     command.Description{Short: "Read TAP from stdin and emit NDJSON; --split routes failures to stdout and passes to a file"},
+		PassthroughArgs: true,
+		RunCLI:          handleFormatNDJSON,
 	})
 
 	return app
@@ -474,6 +483,71 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 		os.Exit(exitCode)
 	}
 
+	return nil
+}
+
+func handleFormatNDJSON(_ context.Context, args json.RawMessage) error {
+	var pt struct {
+		Args []string `json:"args"`
+	}
+	if err := json.Unmarshal(args, &pt); err != nil {
+		return fmt.Errorf("invalid arguments: %w", err)
+	}
+
+	fs := flag.NewFlagSet("format-ndjson", flag.ContinueOnError)
+	split := fs.Bool("split", false, "")
+	passOut := fs.String("pass-out", "", "")
+	if err := fs.Parse(pt.Args); err != nil {
+		return err
+	}
+
+	if *passOut != "" && !*split {
+		fmt.Fprintln(os.Stderr, "error: --pass-out requires --split")
+		os.Exit(2)
+	}
+
+	r := reader.NewReader(os.Stdin)
+	agg := ndjson.NewAggregator()
+	for {
+		ev, err := r.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error reading TAP: %v\n", err)
+			os.Exit(2)
+		}
+		agg.Consume(ev)
+	}
+	summary := r.Summary()
+	out := agg.Finalize(r.Diagnostics(), &summary)
+
+	if !*split {
+		if err := ndjson.WriteAll(os.Stdout, out); err != nil {
+			fmt.Fprintf(os.Stderr, "error writing ndjson: %v\n", err)
+			os.Exit(2)
+		}
+	} else {
+		var passW io.Writer
+		if *passOut != "" {
+			f, err := os.Create(*passOut)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error opening --pass-out: %v\n", err)
+				os.Exit(2)
+			}
+			defer f.Close()
+			passW = f
+		}
+		if err := ndjson.WriteSplit(os.Stdout, passW, out); err != nil {
+			fmt.Fprintf(os.Stderr, "error writing ndjson: %v\n", err)
+			os.Exit(2)
+		}
+	}
+
+	// Exit 1 if any failures or a bailout were seen.
+	if out.Summary.Failed > 0 || out.Summary.Bailed {
+		os.Exit(1)
+	}
 	return nil
 }
 

@@ -2,7 +2,12 @@
 // conforming to docs/rfcs/0001-test-result-ndjson-schema.md.
 package ndjson
 
-import "github.com/amarbel-llc/tap/go/internal/0/diagnostic"
+import (
+	"encoding/json"
+	"io"
+
+	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
+)
 
 //go:generate dagnabit export
 
@@ -206,4 +211,71 @@ func buildTestRecord(ev diagnostic.Event) TestRecord {
 		rec.Directive = &DirectiveValue{Kind: "todo", Reason: tp.Reason}
 	}
 	return rec
+}
+
+// WriteAll emits every record + bailout (if any) + summary to w as
+// newline-delimited JSON.
+func WriteAll(w io.Writer, out Output) error {
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	for _, rec := range out.Records {
+		if err := enc.Encode(rec); err != nil {
+			return err
+		}
+	}
+	if out.Bailout != nil {
+		if err := enc.Encode(out.Bailout); err != nil {
+			return err
+		}
+	}
+	return enc.Encode(out.Summary)
+}
+
+// WriteSplit emits failures (and any bailout + summary) to failOut,
+// and passes (+ bailout + summary) to passOut. passOut may be nil to
+// discard passing records.
+func WriteSplit(failOut, passOut io.Writer, out Output) error {
+	failEnc := json.NewEncoder(failOut)
+	failEnc.SetEscapeHTML(false)
+
+	var passEnc *json.Encoder
+	if passOut != nil {
+		passEnc = json.NewEncoder(passOut)
+		passEnc.SetEscapeHTML(false)
+	}
+
+	for _, rec := range out.Records {
+		if rec.OK {
+			if passEnc != nil {
+				if err := passEnc.Encode(rec); err != nil {
+					return err
+				}
+			}
+		} else {
+			if err := failEnc.Encode(rec); err != nil {
+				return err
+			}
+		}
+	}
+
+	if out.Bailout != nil {
+		if err := failEnc.Encode(out.Bailout); err != nil {
+			return err
+		}
+		if passEnc != nil {
+			if err := passEnc.Encode(out.Bailout); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := failEnc.Encode(out.Summary); err != nil {
+		return err
+	}
+	if passEnc != nil {
+		if err := passEnc.Encode(out.Summary); err != nil {
+			return err
+		}
+	}
+	return nil
 }

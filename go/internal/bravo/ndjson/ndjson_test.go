@@ -1,6 +1,7 @@
 package ndjson
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -249,5 +250,77 @@ func TestAggregatorRecordsBailout(t *testing.T) {
 	}
 	if !out.Summary.Bailed {
 		t.Error("expected summary.Bailed = true")
+	}
+}
+
+func TestWriteAllUnified(t *testing.T) {
+	rec1 := TestRecord{Type: "test", N: 1, Description: "a", OK: true, Line: 1}
+	rec2 := TestRecord{Type: "test", N: 2, Description: "b", OK: false, Line: 2}
+	out := Output{
+		Records: []TestRecord{rec1, rec2},
+		Summary: SummaryRecord{Type: "summary", Passed: 1, Failed: 1, Total: 2, Diagnostics: []SummaryDiagnostic{}},
+	}
+
+	var buf bytes.Buffer
+	if err := WriteAll(&buf, out); err != nil {
+		t.Fatalf("WriteAll: %v", err)
+	}
+
+	lines := bytes.Split(bytes.TrimSuffix(buf.Bytes(), []byte("\n")), []byte("\n"))
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d: %s", len(lines), buf.String())
+	}
+}
+
+func TestWriteSplitRoutesByOK(t *testing.T) {
+	rec1 := TestRecord{Type: "test", N: 1, Description: "a", OK: true, Line: 1}
+	rec2 := TestRecord{Type: "test", N: 2, Description: "b", OK: false, Line: 2}
+	out := Output{
+		Records: []TestRecord{rec1, rec2},
+		Summary: SummaryRecord{Type: "summary", Passed: 1, Failed: 1, Total: 2, Diagnostics: []SummaryDiagnostic{}},
+	}
+
+	var failBuf, passBuf bytes.Buffer
+	if err := WriteSplit(&failBuf, &passBuf, out); err != nil {
+		t.Fatalf("WriteSplit: %v", err)
+	}
+
+	// Both streams contain the summary; failures gets rec2, passes gets rec1.
+	if !bytes.Contains(failBuf.Bytes(), []byte("\"n\":2")) {
+		t.Errorf("failure stream missing record 2: %s", failBuf.String())
+	}
+	if bytes.Contains(failBuf.Bytes(), []byte("\"n\":1")) {
+		t.Errorf("failure stream wrongly includes record 1: %s", failBuf.String())
+	}
+	if !bytes.Contains(passBuf.Bytes(), []byte("\"n\":1")) {
+		t.Errorf("pass stream missing record 1: %s", passBuf.String())
+	}
+	if bytes.Contains(passBuf.Bytes(), []byte("\"n\":2")) {
+		t.Errorf("pass stream wrongly includes record 2: %s", passBuf.String())
+	}
+
+	// Both streams end with the summary.
+	if !bytes.Contains(failBuf.Bytes(), []byte("\"type\":\"summary\"")) {
+		t.Errorf("failure stream missing summary")
+	}
+	if !bytes.Contains(passBuf.Bytes(), []byte("\"type\":\"summary\"")) {
+		t.Errorf("pass stream missing summary")
+	}
+}
+
+func TestWriteSplitNilPassOut(t *testing.T) {
+	rec1 := TestRecord{Type: "test", N: 1, OK: true, Line: 1}
+	rec2 := TestRecord{Type: "test", N: 2, OK: false, Line: 2}
+	out := Output{
+		Records: []TestRecord{rec1, rec2},
+		Summary: SummaryRecord{Type: "summary", Total: 2, Diagnostics: []SummaryDiagnostic{}},
+	}
+
+	var failBuf bytes.Buffer
+	if err := WriteSplit(&failBuf, nil, out); err != nil {
+		t.Fatalf("WriteSplit nil passOut: %v", err)
+	}
+	if bytes.Contains(failBuf.Bytes(), []byte("\"n\":1")) {
+		t.Errorf("passing record leaked into failure stream: %s", failBuf.String())
 	}
 }

@@ -43,6 +43,7 @@ let
       extraEnv = {
         BATS_TEST_TIMEOUT = batsTestTimeout;
       };
+      nativeBuildInputs = [ pkgs.jq ];
     };
 
   batsFiles = lib.filter (f: lib.hasSuffix ".bats" f) (

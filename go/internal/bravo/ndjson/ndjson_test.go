@@ -159,3 +159,31 @@ func TestAggregatorAttachesYAMLDiagnostic(t *testing.T) {
 		t.Errorf("diagnostic severity = %q", got["severity"])
 	}
 }
+
+func TestAggregatorBuffersOutputBlock(t *testing.T) {
+	events := []diagnostic.Event{
+		{Type: diagnostic.EventVersion, Line: 1},
+		{Type: diagnostic.EventOutputHeader, Line: 2, Depth: 0, OutputHeader: &diagnostic.OutputHeaderResult{Number: 1, Description: "build"}},
+		{Type: diagnostic.EventOutputLine, Line: 3, Depth: 0, OutputLine: "compiling main.rs"},
+		{Type: diagnostic.EventOutputLine, Line: 4, Depth: 0, OutputLine: "linking binary"},
+		{Type: diagnostic.EventTestPoint, Line: 5, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 1, Description: "build", OK: true}},
+		{Type: diagnostic.EventPlan, Line: 6, Depth: 0, Plan: &diagnostic.PlanResult{Count: 1}},
+	}
+
+	agg := NewAggregator()
+	for _, ev := range events {
+		agg.Consume(ev)
+	}
+	out := agg.Finalize(nil, nil)
+
+	if len(out.Records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(out.Records))
+	}
+	if out.Records[0].Output == nil {
+		t.Fatal("expected output to be attached")
+	}
+	want := "compiling main.rs\nlinking binary\n"
+	if *out.Records[0].Output != want {
+		t.Errorf("output = %q, want %q", *out.Records[0].Output, want)
+	}
+}

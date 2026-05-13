@@ -3,6 +3,7 @@ package writer
 //go:generate dagnabit export
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"iter"
@@ -12,47 +13,55 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
+	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
+
 	"github.com/amarbel-llc/tap/go/internal/0/style"
 	"github.com/amarbel-llc/tap/go/internal/alfa/yaml_diagnostic"
 )
 
 type Writer struct {
-	w                io.Writer
+	printer          interfaces.Printer
 	n                int
 	depth            int
 	planEmitted      bool
 	failed           bool
 	color            bool
 	locale           language.Tag
-	printer          *message.Printer
+	formatter        *message.Printer
 	streamedOutput   bool
 	ttyBuildLastLine bool
 }
 
 func NewWriter(w io.Writer) *Writer {
-	fmt.Fprintln(w, "TAP version 14")
-	return &Writer{w: w}
+	p := ui.MakePrinterFromWriter(w)
+	fmt.Fprintln(p, "TAP version 14")
+	return &Writer{printer: p}
 }
 
 // NewColorWriter creates a Writer that colorizes ok/not ok when color is true.
 func NewColorWriter(w io.Writer, color bool) *Writer {
-	fmt.Fprintln(w, "TAP version 14")
-	return &Writer{w: w, color: color}
+	p := ui.MakePrinterFromWriter(w)
+	fmt.Fprintln(p, "TAP version 14")
+	return &Writer{printer: p, color: color}
 }
 
 func NewLocaleWriter(w io.Writer, locale language.Tag) *Writer {
-	fmt.Fprintln(w, "TAP version 14")
-	fmt.Fprintf(w, "pragma +locale-formatting:%s\n", locale)
+	p := ui.MakePrinterFromWriter(w)
+	var buf bytes.Buffer
+	fmt.Fprintln(&buf, "TAP version 14")
+	fmt.Fprintf(&buf, "pragma +locale-formatting:%s\n", locale)
+	_, _ = buf.WriteTo(p)
 	return &Writer{
-		w:       w,
-		locale:  locale,
-		printer: message.NewPrinter(locale),
+		printer:   p,
+		locale:    locale,
+		formatter: message.NewPrinter(locale),
 	}
 }
 
 func (tw *Writer) formatNumber(n int) string {
-	if tw.printer != nil {
-		return tw.printer.Sprintf("%d", n)
+	if tw.formatter != nil {
+		return tw.formatter.Sprintf("%d", n)
 	}
 	return fmt.Sprintf("%d", n)
 }
@@ -95,15 +104,17 @@ func (tw *Writer) colorBailOut() string {
 func (tw *Writer) Ok(description string) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorOk(), num, description)
+	fmt.Fprintf(tw.printer, "%s %s - %s\n", tw.colorOk(), num, description)
 	return tw.n
 }
 
 func (tw *Writer) OkDiag(description string, diagnostics *yaml_diagnostic.YAMLDiagnostic) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorOk(), num, description)
-	yaml_diagnostic.WriteDiagnostics(tw.w, diagnostics, tw.color)
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorOk(), num, description)
+	yaml_diagnostic.WriteDiagnostics(&buf, diagnostics, tw.color)
+	_, _ = buf.WriteTo(tw.printer)
 	return tw.n
 }
 
@@ -111,14 +122,14 @@ func (tw *Writer) HasFailures() bool {
 	return tw.failed
 }
 
-// TODO clean this function up
 func (tw *Writer) NotOk(description string, diagnostics map[string]string) int {
 	tw.n++
 	tw.failed = true
 	num := tw.formatNumber(tw.n)
-	fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorNotOk(), num, description)
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorNotOk(), num, description)
 	if len(diagnostics) > 0 {
-		fmt.Fprintln(tw.w, "  ---")
+		fmt.Fprintln(&buf, "  ---")
 		keys := make([]string, 0, len(diagnostics))
 		for k := range diagnostics {
 			keys = append(keys, k)
@@ -127,47 +138,50 @@ func (tw *Writer) NotOk(description string, diagnostics map[string]string) int {
 		for _, k := range keys {
 			v := yaml_diagnostic.SanitizeYAMLValue(diagnostics[k], tw.color)
 			if strings.Contains(v, "\n") {
-				fmt.Fprintf(tw.w, "  %s: |\n", k)
+				fmt.Fprintf(&buf, "  %s: |\n", k)
 				lines := strings.Split(v, "\n")
 				for len(lines) > 0 && lines[len(lines)-1] == "" {
 					lines = lines[:len(lines)-1]
 				}
 				for _, line := range lines {
-					fmt.Fprintf(tw.w, "    %s\n", line)
+					fmt.Fprintf(&buf, "    %s\n", line)
 				}
 			} else {
-				fmt.Fprintf(tw.w, "  %s: %s\n", k, v)
+				fmt.Fprintf(&buf, "  %s: %s\n", k, v)
 			}
 		}
-		fmt.Fprintln(tw.w, "  ...")
+		fmt.Fprintln(&buf, "  ...")
 	}
+	_, _ = buf.WriteTo(tw.printer)
 	return tw.n
 }
 
 func (tw *Writer) Skip(description, reason string) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	fmt.Fprintf(tw.w, "%s %s - %s %s %s\n", tw.colorOk(), num, description, tw.colorSkip(), reason)
+	fmt.Fprintf(tw.printer, "%s %s - %s %s %s\n", tw.colorOk(), num, description, tw.colorSkip(), reason)
 	return tw.n
 }
 
 func (tw *Writer) SkipDiag(description, reason string, diagnostics *yaml_diagnostic.YAMLDiagnostic) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	fmt.Fprintf(tw.w, "%s %s - %s %s %s\n", tw.colorOk(), num, description, tw.colorSkip(), reason)
-	yaml_diagnostic.WriteDiagnostics(tw.w, diagnostics, tw.color)
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "%s %s - %s %s %s\n", tw.colorOk(), num, description, tw.colorSkip(), reason)
+	yaml_diagnostic.WriteDiagnostics(&buf, diagnostics, tw.color)
+	_, _ = buf.WriteTo(tw.printer)
 	return tw.n
 }
 
 func (tw *Writer) Todo(description, reason string) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	fmt.Fprintf(tw.w, "%s %s - %s %s %s\n", tw.colorNotOk(), num, description, tw.colorTodo(), reason)
+	fmt.Fprintf(tw.printer, "%s %s - %s %s %s\n", tw.colorNotOk(), num, description, tw.colorTodo(), reason)
 	return tw.n
 }
 
 func (tw *Writer) PlanAhead(n int) {
-	fmt.Fprintf(tw.w, "1..%s\n", tw.formatNumber(n))
+	fmt.Fprintf(tw.printer, "1..%s\n", tw.formatNumber(n))
 	tw.planEmitted = true
 }
 
@@ -176,15 +190,15 @@ func (tw *Writer) Plan() {
 		return
 	}
 	tw.planEmitted = true
-	fmt.Fprintf(tw.w, "1..%s\n", tw.formatNumber(tw.n))
+	fmt.Fprintf(tw.printer, "1..%s\n", tw.formatNumber(tw.n))
 }
 
 func (tw *Writer) BailOut(format string, args ...any) {
-	fmt.Fprintf(tw.w, "%s %s\n", tw.colorBailOut(), fmt.Sprintf(format, args...))
+	fmt.Fprintf(tw.printer, "%s %s\n", tw.colorBailOut(), fmt.Sprintf(format, args...))
 }
 
 func (tw *Writer) Comment(format string, args ...any) {
-	fmt.Fprintf(tw.w, "# %s\n", fmt.Sprintf(format, args...))
+	fmt.Fprintf(tw.printer, "# %s\n", fmt.Sprintf(format, args...))
 }
 
 func (tw *Writer) Pragma(key string, enabled bool) {
@@ -192,7 +206,7 @@ func (tw *Writer) Pragma(key string, enabled bool) {
 	if enabled {
 		sign = "+"
 	}
-	fmt.Fprintf(tw.w, "pragma %s%s\n", sign, key)
+	fmt.Fprintf(tw.printer, "pragma %s%s\n", sign, key)
 	if key == "streamed-output" && enabled {
 		tw.streamedOutput = true
 	}
@@ -202,20 +216,20 @@ func (tw *Writer) Pragma(key string, enabled bool) {
 }
 
 func (tw *Writer) StreamedOutput(text string) {
-	fmt.Fprintf(tw.w, "# %s\n", text)
+	fmt.Fprintf(tw.printer, "# %s\n", text)
 }
 
 func (tw *Writer) EnableTTYBuildLastLine() {
 	tw.ttyBuildLastLine = true
-	fmt.Fprintln(tw.w, "pragma +tty-build-last-line")
+	fmt.Fprintln(tw.printer, "pragma +tty-build-last-line")
 }
 
 func (tw *Writer) UpdateLastLine(text string) {
-	fmt.Fprintf(tw.w, "\r\033[2K# %s", text)
+	fmt.Fprintf(tw.printer, "\r\033[2K# %s", text)
 }
 
 func (tw *Writer) FinishLastLine() {
-	fmt.Fprint(tw.w, "\r\033[2K")
+	fmt.Fprint(tw.printer, "\r\033[2K")
 }
 
 // OutputBlockWriter writes indented body lines inside an Output Block.
@@ -234,12 +248,14 @@ type pendingOutputHeader struct {
 // Line writes a single 4-space-indented output line, applying SGR filtering.
 // On first invocation it flushes the deferred "# Output:" header.
 func (ob *OutputBlockWriter) Line(text string) {
+	var buf bytes.Buffer
 	if ob.pendingHeader != nil {
-		fmt.Fprintf(ob.w, "# Output: %s - %s\n", ob.pendingHeader.num, ob.pendingHeader.description)
+		fmt.Fprintf(&buf, "# Output: %s - %s\n", ob.pendingHeader.num, ob.pendingHeader.description)
 		ob.pendingHeader = nil
 	}
 	text = yaml_diagnostic.SanitizeYAMLValue(text, ob.color)
-	fmt.Fprintf(ob.w, "    %s\n", text)
+	fmt.Fprintf(&buf, "    %s\n", text)
+	_, _ = buf.WriteTo(ob.w)
 }
 
 // OutputBlock emits an Output Block per the streamed-output amendment.
@@ -249,60 +265,68 @@ func (tw *Writer) OutputBlock(description string, fn func(*OutputBlockWriter) *y
 	tw.n++
 	num := tw.formatNumber(tw.n)
 	ob := &OutputBlockWriter{
-		w:             tw.w,
+		w:             tw.printer,
 		color:         tw.color,
 		pendingHeader: &pendingOutputHeader{num: num, description: description},
 	}
 	diag := fn(ob)
+	var buf bytes.Buffer
 	if diag != nil {
 		tw.failed = true
-		fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorNotOk(), num, description)
-		yaml_diagnostic.WriteDiagnostics(tw.w, diag, tw.color)
+		fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorNotOk(), num, description)
+		yaml_diagnostic.WriteDiagnostics(&buf, diag, tw.color)
 	} else {
-		fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorOk(), num, description)
+		fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorOk(), num, description)
 	}
+	_, _ = buf.WriteTo(tw.printer)
 	return tw.n
 }
 
 // indentWriter prefixes every written line with prefix, used by Subtest to
 // indent the entire child Writer's output by 4 spaces under its
-// "# Subtest:" header.
+// "# Subtest:" header. It buffers all prefixed lines from a single Write
+// call into one downstream Write so atomic records assembled upstream
+// remain atomic after indentation.
 type indentWriter struct {
 	w      io.Writer
 	prefix string
 }
 
 func (iw *indentWriter) Write(p []byte) (int, error) {
+	var buf bytes.Buffer
 	lines := strings.Split(string(p), "\n")
 	for i, line := range lines {
 		if i == len(lines)-1 && line == "" {
 			break
 		}
-		out := iw.prefix + line + "\n"
-		if _, err := iw.w.Write([]byte(out)); err != nil {
-			return 0, err
-		}
+		buf.WriteString(iw.prefix)
+		buf.WriteString(line)
+		buf.WriteByte('\n')
+	}
+	if _, err := iw.w.Write(buf.Bytes()); err != nil {
+		return 0, err
 	}
 	return len(p), nil
 }
 
 func (tw *Writer) Subtest(format string, args ...any) *Writer {
 	prefix := "    "
-	fmt.Fprintf(tw.w, "%s# Subtest: %s\n", prefix, fmt.Sprintf(format, args...))
-	iw := &indentWriter{w: tw.w, prefix: prefix}
+	fmt.Fprintf(tw.printer, "%s# Subtest: %s\n", prefix, fmt.Sprintf(format, args...))
+	iw := &indentWriter{w: tw.printer, prefix: prefix}
+	childPrinter := ui.MakePrinterFromWriter(iw)
 	child := &Writer{
-		w:       iw,
-		depth:   tw.depth + 1,
-		color:   tw.color,
-		locale:  tw.locale,
-		printer: tw.printer,
+		printer:   childPrinter,
+		depth:     tw.depth + 1,
+		color:     tw.color,
+		locale:    tw.locale,
+		formatter: tw.formatter,
 	}
-	if tw.printer != nil {
-		fmt.Fprintf(iw, "pragma +locale-formatting:%s\n", tw.locale)
+	if tw.formatter != nil {
+		fmt.Fprintf(childPrinter, "pragma +locale-formatting:%s\n", tw.locale)
 	}
 	if tw.streamedOutput {
 		child.streamedOutput = true
-		fmt.Fprintln(iw, "pragma +streamed-output")
+		fmt.Fprintln(childPrinter, "pragma +streamed-output")
 	}
 	return child
 }
@@ -335,14 +359,18 @@ func (tw *Writer) WriteAll(tests iter.Seq[TestPoint]) {
 		} else if tp.Ok {
 			tw.n++
 			num := tw.formatNumber(tw.n)
-			fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorOk(), num, tp.Description)
-			yaml_diagnostic.WriteDiagnostics(tw.w, tp.Diagnostics, tw.color)
+			var buf bytes.Buffer
+			fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorOk(), num, tp.Description)
+			yaml_diagnostic.WriteDiagnostics(&buf, tp.Diagnostics, tw.color)
+			_, _ = buf.WriteTo(tw.printer)
 		} else {
 			tw.n++
 			tw.failed = true
 			num := tw.formatNumber(tw.n)
-			fmt.Fprintf(tw.w, "%s %s - %s\n", tw.colorNotOk(), num, tp.Description)
-			yaml_diagnostic.WriteDiagnostics(tw.w, tp.Diagnostics, tw.color)
+			var buf bytes.Buffer
+			fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorNotOk(), num, tp.Description)
+			yaml_diagnostic.WriteDiagnostics(&buf, tp.Diagnostics, tw.color)
+			_, _ = buf.WriteTo(tw.printer)
 		}
 	}
 	if !tw.planEmitted {

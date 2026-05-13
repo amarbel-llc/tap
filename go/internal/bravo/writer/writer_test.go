@@ -2,8 +2,11 @@ package writer
 
 import (
 	"bytes"
+	"io"
+	"os"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"golang.org/x/text/language"
@@ -1182,5 +1185,98 @@ func TestOutputBlockRoundTrip(t *testing.T) {
 	}
 	if !summary.Valid {
 		t.Errorf("expected valid TAP, diagnostics: %v", r.Diagnostics())
+	}
+}
+
+// TestWriterNotOkAtomicUnderConcurrency drives many concurrent NotOk and
+// Comment emissions through two independent Writers sharing the same
+// *os.File. Go's *os.File serializes every Write call through pollDesc,
+// so if each writer assembles a record into one Write call the records
+// must arrive contiguous on the read side. The test asserts that every
+// "not ok" line is followed immediately by its full YAML "  ---" /
+// "  ..." block with only YAML body lines in between — no comment lines,
+// no other records — proving that the writer assembles each record into a
+// single Write call.
+//
+// Using two independent Writers (rather than one shared Writer with two
+// goroutines) keeps the test focused on fd-level write atomicity. The
+// Writer's internal counters are not safe for concurrent mutation; that
+// is a separate concern. Each goroutine here owns its Writer.
+func TestWriterNotOkAtomicUnderConcurrency(t *testing.T) {
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	defer pr.Close()
+
+	const records = 50
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		tw := NewWriter(pw)
+		for i := 0; i < records; i++ {
+			tw.NotOk("failing test", map[string]string{
+				"message":  "boom",
+				"severity": "fail",
+				"exitcode": "1",
+			})
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		tw := NewWriter(pw)
+		for i := 0; i < records; i++ {
+			tw.Comment("status update")
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		pw.Close()
+	}()
+
+	var out bytes.Buffer
+	if _, err := io.Copy(&out, pr); err != nil {
+		t.Fatalf("io.Copy: %v", err)
+	}
+
+	lines := strings.Split(out.String(), "\n")
+	notOkBlocks := 0
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		if !strings.HasPrefix(line, "not ok") {
+			continue
+		}
+		notOkBlocks++
+		if i+1 >= len(lines) {
+			t.Fatalf("not ok at end with no YAML header: line %d", i)
+		}
+		if lines[i+1] != "  ---" {
+			t.Fatalf("not ok at line %d not immediately followed by '  ---': got %q\nfull output:\n%s",
+				i, lines[i+1], out.String())
+		}
+		// Walk forward to the matching '  ...', asserting only YAML body
+		// lines (prefixed with two-space indent) appear in between.
+		closed := false
+		for j := i + 2; j < len(lines); j++ {
+			if lines[j] == "  ..." {
+				closed = true
+				i = j
+				break
+			}
+			if !strings.HasPrefix(lines[j], "  ") {
+				t.Fatalf("non-YAML line interleaved inside record starting at line %d:\nrecord head: %q\ninterleaved line %d: %q\nfull output:\n%s",
+					i, line, j, lines[j], out.String())
+			}
+		}
+		if !closed {
+			t.Fatalf("YAML block starting at line %d never closed with '  ...'\nfull output:\n%s",
+				i, out.String())
+		}
+	}
+	if notOkBlocks != records {
+		t.Fatalf("expected %d not ok blocks, saw %d\nfull output:\n%s",
+			records, notOkBlocks, out.String())
 	}
 }

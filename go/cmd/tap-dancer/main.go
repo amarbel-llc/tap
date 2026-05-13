@@ -13,6 +13,8 @@ import (
 	"os/signal"
 	"strings"
 
+	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
@@ -190,8 +192,10 @@ func handleGoTest(ctx context.Context, args json.RawMessage) error {
 	// wastes cycles. Force color off in that case.
 	color := stdoutIsTerminal() && *format == "tap"
 
+	tapOut := tapStdoutPrinter()
+
 	if err := cmd.Start(); err != nil {
-		tw := writer.NewColorWriter(os.Stdout, color)
+		tw := writer.NewColorWriter(tapOut, color)
 		tw.BailOut("failed to start go test: %v", err)
 		return err
 	}
@@ -210,7 +214,7 @@ func handleGoTest(ctx context.Context, args json.RawMessage) error {
 		return nil
 	}
 
-	exitCode := gotest.ConvertGoTest(stdout, os.Stdout, *verbose, *skipEmpty, color)
+	exitCode := gotest.ConvertGoTest(stdout, tapOut, *verbose, *skipEmpty, color)
 
 	// Wait for command to finish (ignore error — we use our own exit code)
 	cmd.Wait()
@@ -264,9 +268,10 @@ func handleCargoTest(ctx context.Context, args json.RawMessage) error {
 	}
 
 	color := stdoutIsTerminal() && *format == "tap"
+	tapOut := tapStdoutPrinter()
 
 	if err := cmd.Start(); err != nil {
-		tw := writer.NewColorWriter(os.Stdout, color)
+		tw := writer.NewColorWriter(tapOut, color)
 		tw.BailOut("failed to start cargo test: %v", err)
 		return err
 	}
@@ -293,13 +298,13 @@ func handleCargoTest(ctx context.Context, args json.RawMessage) error {
 		return nil
 	}
 
-	exitCode := cargotest.ConvertCargoTest(stdout, os.Stdout, *verbose, *skipEmpty, color)
+	exitCode := cargotest.ConvertCargoTest(stdout, tapOut, *verbose, *skipEmpty, color)
 
 	cmdErr := cmd.Wait()
 
 	// If cargo failed and we got no test output, it's a build failure.
 	if cmdErr != nil && exitCode == 0 {
-		tw := writer.NewColorWriter(os.Stdout, color)
+		tw := writer.NewColorWriter(tapOut, color)
 		msg := strings.TrimSpace(stderrBuf.String())
 		if msg == "" {
 			msg = cmdErr.Error()
@@ -468,7 +473,8 @@ func handleExec(ctx context.Context, args json.RawMessage) error {
 	execArgs := cliArgs[1:]
 
 	color := stdoutIsTerminal()
-	exitCode := exec_parallel.ConvertExec(ctx, utility, execArgs, os.Stdout, *verbose, color, exec_parallel.WithSpinner(!*noSpinner))
+	tapOut := tapStdoutPrinter()
+	exitCode := exec_parallel.ConvertExec(ctx, utility, execArgs, tapOut, *verbose, color, exec_parallel.WithSpinner(!*noSpinner))
 
 	if exitCode != 0 {
 		os.Exit(exitCode)
@@ -522,14 +528,15 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 	}
 
 	color := stdoutIsTerminal()
+	tapOut := tapStdoutPrinter()
 	executor := &exec_parallel.GoroutineExecutor{MaxJobs: *maxJobs}
 
 	var exitCode int
 	if color {
-		exitCode = exec_parallel.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, os.Stdout, *verbose, color, exec_parallel.WithSpinner(!*noSpinner))
+		exitCode = exec_parallel.ConvertExecParallelWithStatus(ctx, executor, template, execArgs, tapOut, *verbose, color, exec_parallel.WithSpinner(!*noSpinner))
 	} else {
 		results := executor.Run(ctx, template, execArgs)
-		exitCode = exec_parallel.ConvertExecParallel(results, os.Stdout, *verbose, color)
+		exitCode = exec_parallel.ConvertExecParallel(results, tapOut, *verbose, color)
 	}
 
 	if exitCode != 0 {
@@ -649,4 +656,12 @@ func stdoutIsTerminal() bool {
 		return false
 	}
 	return (stat.Mode() & os.ModeCharDevice) != 0
+}
+
+// tapStdoutPrinter wraps os.Stdout in dewey's ui.Printer abstraction so
+// every record-emitter in a given handler shares one Printer instance.
+// The Printer satisfies io.Writer and can be passed to any function that
+// expects io.Writer (writer.NewColorWriter, gotest.ConvertGoTest, ...).
+func tapStdoutPrinter() interfaces.Printer {
+	return ui.MakePrinter(os.Stdout)
 }

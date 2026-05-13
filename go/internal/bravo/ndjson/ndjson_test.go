@@ -253,6 +253,69 @@ func TestAggregatorRecordsBailout(t *testing.T) {
 	}
 }
 
+func TestAggregatorOrphanChildrenEmitDiagnostic(t *testing.T) {
+	// Subtest children with no parent test point: pendingChildren is non-empty
+	// at Finalize. Aggregator must report it via summary.diagnostics.
+	events := []diagnostic.Event{
+		{Type: diagnostic.EventVersion, Line: 1, Depth: 0},
+		{Type: diagnostic.EventPlan, Line: 2, Depth: 0, Plan: &diagnostic.PlanResult{Count: 1}},
+		// Two depth-1 children, no depth-0 parent ever arrives.
+		{Type: diagnostic.EventTestPoint, Line: 3, Depth: 1, TestPoint: &diagnostic.TestPointResult{Number: 1, Description: "orphan a", OK: true}},
+		{Type: diagnostic.EventTestPoint, Line: 4, Depth: 1, TestPoint: &diagnostic.TestPointResult{Number: 2, Description: "orphan b", OK: false}},
+	}
+
+	agg := NewAggregator()
+	for _, ev := range events {
+		agg.Consume(ev)
+	}
+	out := agg.Finalize(nil, nil)
+
+	if len(out.Records) != 0 {
+		t.Errorf("expected 0 top-level records, got %d (orphans must not be flushed as top-level)", len(out.Records))
+	}
+
+	found := false
+	for _, d := range out.Summary.Diagnostics {
+		if d.Rule == "orphan-subtest-children" && d.Severity == "error" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected orphan-subtest-children error diagnostic, got %+v", out.Summary.Diagnostics)
+	}
+	if out.Summary.Valid {
+		t.Errorf("expected Valid=false when orphan children are present")
+	}
+}
+
+func TestAggregatorValidTrueAfterBailout(t *testing.T) {
+	// RFC §"Summary Record": `valid` reports structural sanity and is
+	// independent of `bailed`. A bailed-out stream with no error
+	// diagnostics MUST report valid:true (bailout explains the gap).
+	events := []diagnostic.Event{
+		{Type: diagnostic.EventVersion, Line: 1},
+		{Type: diagnostic.EventPlan, Line: 2, Plan: &diagnostic.PlanResult{Count: 10}},
+		{Type: diagnostic.EventTestPoint, Line: 3, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 1, OK: true}},
+		{Type: diagnostic.EventBailOut, Line: 4, Depth: 0, BailOut: &diagnostic.BailOutResult{Reason: "disk full"}},
+	}
+
+	agg := NewAggregator()
+	for _, ev := range events {
+		agg.Consume(ev)
+	}
+	// Simulate the reader's behavior: bailout suppresses plan-count-mismatch,
+	// so readerSummary.Valid is true and readerDiags is empty.
+	readerSummary := &diagnostic.Summary{Valid: true, BailedOut: true}
+	out := agg.Finalize(nil, readerSummary)
+
+	if !out.Summary.Bailed {
+		t.Error("expected Bailed=true")
+	}
+	if !out.Summary.Valid {
+		t.Errorf("expected Valid=true after bailout when reader reports valid (RFC §Summary Record), got Valid=%v with diagnostics=%+v", out.Summary.Valid, out.Summary.Diagnostics)
+	}
+}
+
 func TestWriteAllUnified(t *testing.T) {
 	rec1 := TestRecord{Type: "test", N: 1, Description: "a", OK: true, Line: 1}
 	rec2 := TestRecord{Type: "test", N: 2, Description: "b", OK: false, Line: 2}

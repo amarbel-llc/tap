@@ -154,8 +154,8 @@ stream. Its fields are:
 | `total` | integer | MUST | Total count of top-level test points emitted (sum of `passed`, `failed`, `skipped`, `todo`). |
 | `plan_count` | integer | MUST | The count from the TAP plan line (e.g., `1..10` yields `10`). MUST be `0` if no plan line was present. |
 | `bailed` | boolean | MUST | `true` if the source stream contained a `Bail out!` directive. |
-| `valid` | boolean | MUST | `true` if no parse errors were detected and `plan_count` matched `total`. `false` otherwise. |
-| `diagnostics` | array | MUST | Array of parse diagnostics. MUST be empty if `valid` is `true`. Each element is an object with `line` (integer), `severity` (string), `rule` (string), and `message` (string). |
+| `valid` | boolean | MUST | `true` if no error-severity parse diagnostics were detected. `false` otherwise. `valid` reports structural sanity; it is independent of `bailed`. A bailed-out stream MAY be `valid: true` because the `Bail out!` directive explicitly accounts for any remaining-test discrepancy, and the producer suppresses `plan-count-mismatch` in that case. Agents checking for run completeness MUST consult `bailed` (and compare `total` to `plan_count`); checking only `valid` is insufficient. |
+| `diagnostics` | array | MUST | Array of parse diagnostics. Each element is an object with `line` (integer), `severity` (string), `rule` (string), and `message` (string). MUST be empty if `valid` is `true`. Warning-severity diagnostics MAY appear without forcing `valid: false`. |
 
 Subtest test points MUST NOT be counted in `passed`, `failed`,
 `skipped`, `todo`, or `total`. Only top-level test points contribute to
@@ -173,7 +173,18 @@ the final record in the document.
 #### Example: Bailed-Out Run
 
 ```json
-{"type":"summary","passed":2,"failed":1,"skipped":0,"todo":0,"total":3,"plan_count":10,"bailed":true,"valid":false,"diagnostics":[{"line":42,"severity":"error","rule":"plan-count-mismatch","message":"plan declared 10 tests but 3 ran"}]}
+{"type":"summary","passed":2,"failed":1,"skipped":0,"todo":0,"total":3,"plan_count":10,"bailed":true,"valid":true,"diagnostics":[]}
+```
+
+The stream is `valid: true` because the `Bail out!` directive
+explains the gap between `total` (3) and `plan_count` (10); no
+error-severity diagnostic was emitted. `bailed: true` is the signal
+that the run did not complete.
+
+#### Example: Malformed Run
+
+```json
+{"type":"summary","passed":0,"failed":0,"skipped":0,"todo":0,"total":0,"plan_count":0,"bailed":false,"valid":false,"diagnostics":[{"line":1,"severity":"error","rule":"version-required","message":"first line must be TAP version 14"}]}
 ```
 
 ### Diagnostic Parsing

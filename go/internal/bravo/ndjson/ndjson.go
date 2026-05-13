@@ -4,6 +4,7 @@ package ndjson
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
@@ -189,11 +190,35 @@ func (a *Aggregator) Finalize(readerDiags []diagnostic.Diagnostic, readerSummary
 		})
 	}
 
+	// Orphan subtest children: any depth>0 records still in
+	// pendingChildren at finalization were never claimed by a parent
+	// test point. Surface them as parse diagnostics so agents know
+	// the stream was malformed; the orphans themselves are dropped
+	// from the output rather than synthesized into placeholder
+	// records.
+	for depth, kids := range a.pendingChildren {
+		if len(kids) == 0 {
+			continue
+		}
+		summary.Diagnostics = append(summary.Diagnostics, SummaryDiagnostic{
+			Line:     kids[0].Line,
+			Severity: "error",
+			Rule:     "orphan-subtest-children",
+			Message:  fmt.Sprintf("%d subtest child record(s) at depth %d had no parent test point", len(kids), depth),
+		})
+	}
+
 	summary.Bailed = a.bailed
-	if readerSummary != nil {
-		summary.Valid = readerSummary.Valid
-	} else {
-		summary.Valid = len(readerDiags) == 0
+	// `valid` reports structural sanity: any error-severity diagnostic
+	// (from the reader OR from our own orphan detection) drives it
+	// false. It is independent of `bailed`; see RFC 0001 §"Summary
+	// Record".
+	summary.Valid = true
+	for _, d := range summary.Diagnostics {
+		if d.Severity == "error" {
+			summary.Valid = false
+			break
+		}
 	}
 
 	return Output{

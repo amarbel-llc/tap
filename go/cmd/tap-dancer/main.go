@@ -13,7 +13,6 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
@@ -192,7 +191,7 @@ func handleGoTest(ctx context.Context, args json.RawMessage) error {
 	// wastes cycles. Force color off in that case.
 	color := stdoutIsTerminal() && *format == "tap"
 
-	tapOut := tapStdoutPrinter()
+	tapOut := ui.MakePrinter(os.Stdout)
 
 	if err := cmd.Start(); err != nil {
 		tw := writer.NewColorWriter(tapOut, color)
@@ -268,7 +267,7 @@ func handleCargoTest(ctx context.Context, args json.RawMessage) error {
 	}
 
 	color := stdoutIsTerminal() && *format == "tap"
-	tapOut := tapStdoutPrinter()
+	tapOut := ui.MakePrinter(os.Stdout)
 
 	if err := cmd.Start(); err != nil {
 		tw := writer.NewColorWriter(tapOut, color)
@@ -473,7 +472,7 @@ func handleExec(ctx context.Context, args json.RawMessage) error {
 	execArgs := cliArgs[1:]
 
 	color := stdoutIsTerminal()
-	tapOut := tapStdoutPrinter()
+	tapOut := ui.MakePrinter(os.Stdout)
 	exitCode := exec_parallel.ConvertExec(ctx, utility, execArgs, tapOut, *verbose, color, exec_parallel.WithSpinner(!*noSpinner))
 
 	if exitCode != 0 {
@@ -528,7 +527,7 @@ func handleExecParallel(ctx context.Context, args json.RawMessage) error {
 	}
 
 	color := stdoutIsTerminal()
-	tapOut := tapStdoutPrinter()
+	tapOut := ui.MakePrinter(os.Stdout)
 	executor := &exec_parallel.GoroutineExecutor{MaxJobs: *maxJobs}
 
 	var exitCode int
@@ -656,12 +655,4 @@ func stdoutIsTerminal() bool {
 		return false
 	}
 	return (stat.Mode() & os.ModeCharDevice) != 0
-}
-
-// tapStdoutPrinter wraps os.Stdout in dewey's ui.Printer abstraction so
-// every record-emitter in a given handler shares one Printer instance.
-// The Printer satisfies io.Writer and can be passed to any function that
-// expects io.Writer (writer.NewColorWriter, gotest.ConvertGoTest, ...).
-func tapStdoutPrinter() interfaces.Printer {
-	return ui.MakePrinter(os.Stdout)
 }

@@ -108,13 +108,24 @@ func (tw *Writer) Ok(description string) int {
 	return tw.n
 }
 
+// atomicEmit assembles a multi-line TAP record into a buffer and writes
+// it to the underlying printer in a single Write call. The single Write
+// is atomic against concurrent goroutines sharing the same *os.File
+// fd (Go's runtime serializes through pollDesc), so the record's lines
+// never interleave with output from elsewhere.
+func (tw *Writer) atomicEmit(fn func(io.Writer)) {
+	var buf bytes.Buffer
+	fn(&buf)
+	_, _ = buf.WriteTo(tw.printer)
+}
+
 func (tw *Writer) OkDiag(description string, diagnostics *yaml_diagnostic.YAMLDiagnostic) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorOk(), num, description)
-	yaml_diagnostic.WriteDiagnostics(&buf, diagnostics, tw.color)
-	_, _ = buf.WriteTo(tw.printer)
+	tw.atomicEmit(func(w io.Writer) {
+		fmt.Fprintf(w, "%s %s - %s\n", tw.colorOk(), num, description)
+		yaml_diagnostic.WriteDiagnostics(w, diagnostics, tw.color)
+	})
 	return tw.n
 }
 
@@ -126,10 +137,12 @@ func (tw *Writer) NotOk(description string, diagnostics map[string]string) int {
 	tw.n++
 	tw.failed = true
 	num := tw.formatNumber(tw.n)
-	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorNotOk(), num, description)
-	if len(diagnostics) > 0 {
-		fmt.Fprintln(&buf, "  ---")
+	tw.atomicEmit(func(w io.Writer) {
+		fmt.Fprintf(w, "%s %s - %s\n", tw.colorNotOk(), num, description)
+		if len(diagnostics) == 0 {
+			return
+		}
+		fmt.Fprintln(w, "  ---")
 		keys := make([]string, 0, len(diagnostics))
 		for k := range diagnostics {
 			keys = append(keys, k)
@@ -138,21 +151,20 @@ func (tw *Writer) NotOk(description string, diagnostics map[string]string) int {
 		for _, k := range keys {
 			v := yaml_diagnostic.SanitizeYAMLValue(diagnostics[k], tw.color)
 			if strings.Contains(v, "\n") {
-				fmt.Fprintf(&buf, "  %s: |\n", k)
+				fmt.Fprintf(w, "  %s: |\n", k)
 				lines := strings.Split(v, "\n")
 				for len(lines) > 0 && lines[len(lines)-1] == "" {
 					lines = lines[:len(lines)-1]
 				}
 				for _, line := range lines {
-					fmt.Fprintf(&buf, "    %s\n", line)
+					fmt.Fprintf(w, "    %s\n", line)
 				}
 			} else {
-				fmt.Fprintf(&buf, "  %s: %s\n", k, v)
+				fmt.Fprintf(w, "  %s: %s\n", k, v)
 			}
 		}
-		fmt.Fprintln(&buf, "  ...")
-	}
-	_, _ = buf.WriteTo(tw.printer)
+		fmt.Fprintln(w, "  ...")
+	})
 	return tw.n
 }
 
@@ -166,10 +178,10 @@ func (tw *Writer) Skip(description, reason string) int {
 func (tw *Writer) SkipDiag(description, reason string, diagnostics *yaml_diagnostic.YAMLDiagnostic) int {
 	tw.n++
 	num := tw.formatNumber(tw.n)
-	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "%s %s - %s %s %s\n", tw.colorOk(), num, description, tw.colorSkip(), reason)
-	yaml_diagnostic.WriteDiagnostics(&buf, diagnostics, tw.color)
-	_, _ = buf.WriteTo(tw.printer)
+	tw.atomicEmit(func(w io.Writer) {
+		fmt.Fprintf(w, "%s %s - %s %s %s\n", tw.colorOk(), num, description, tw.colorSkip(), reason)
+		yaml_diagnostic.WriteDiagnostics(w, diagnostics, tw.color)
+	})
 	return tw.n
 }
 
@@ -270,15 +282,17 @@ func (tw *Writer) OutputBlock(description string, fn func(*OutputBlockWriter) *y
 		pendingHeader: &pendingOutputHeader{num: num, description: description},
 	}
 	diag := fn(ob)
-	var buf bytes.Buffer
 	if diag != nil {
 		tw.failed = true
-		fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorNotOk(), num, description)
-		yaml_diagnostic.WriteDiagnostics(&buf, diag, tw.color)
-	} else {
-		fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorOk(), num, description)
 	}
-	_, _ = buf.WriteTo(tw.printer)
+	tw.atomicEmit(func(w io.Writer) {
+		if diag != nil {
+			fmt.Fprintf(w, "%s %s - %s\n", tw.colorNotOk(), num, description)
+			yaml_diagnostic.WriteDiagnostics(w, diag, tw.color)
+		} else {
+			fmt.Fprintf(w, "%s %s - %s\n", tw.colorOk(), num, description)
+		}
+	})
 	return tw.n
 }
 
@@ -294,14 +308,18 @@ type indentWriter struct {
 
 func (iw *indentWriter) Write(p []byte) (int, error) {
 	var buf bytes.Buffer
-	lines := strings.Split(string(p), "\n")
-	for i, line := range lines {
-		if i == len(lines)-1 && line == "" {
+	prefix := []byte(iw.prefix)
+	rest := p
+	for len(rest) > 0 {
+		nl := bytes.IndexByte(rest, '\n')
+		if nl < 0 {
+			buf.Write(prefix)
+			buf.Write(rest)
 			break
 		}
-		buf.WriteString(iw.prefix)
-		buf.WriteString(line)
-		buf.WriteByte('\n')
+		buf.Write(prefix)
+		buf.Write(rest[:nl+1])
+		rest = rest[nl+1:]
 	}
 	if _, err := iw.w.Write(buf.Bytes()); err != nil {
 		return 0, err
@@ -359,18 +377,18 @@ func (tw *Writer) WriteAll(tests iter.Seq[TestPoint]) {
 		} else if tp.Ok {
 			tw.n++
 			num := tw.formatNumber(tw.n)
-			var buf bytes.Buffer
-			fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorOk(), num, tp.Description)
-			yaml_diagnostic.WriteDiagnostics(&buf, tp.Diagnostics, tw.color)
-			_, _ = buf.WriteTo(tw.printer)
+			tw.atomicEmit(func(w io.Writer) {
+				fmt.Fprintf(w, "%s %s - %s\n", tw.colorOk(), num, tp.Description)
+				yaml_diagnostic.WriteDiagnostics(w, tp.Diagnostics, tw.color)
+			})
 		} else {
 			tw.n++
 			tw.failed = true
 			num := tw.formatNumber(tw.n)
-			var buf bytes.Buffer
-			fmt.Fprintf(&buf, "%s %s - %s\n", tw.colorNotOk(), num, tp.Description)
-			yaml_diagnostic.WriteDiagnostics(&buf, tp.Diagnostics, tw.color)
-			_, _ = buf.WriteTo(tw.printer)
+			tw.atomicEmit(func(w io.Writer) {
+				fmt.Fprintf(w, "%s %s - %s\n", tw.colorNotOk(), num, tp.Description)
+				yaml_diagnostic.WriteDiagnostics(w, tp.Diagnostics, tw.color)
+			})
 		}
 	}
 	if !tw.planEmitted {

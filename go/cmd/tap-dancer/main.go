@@ -34,8 +34,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  tap-dancer [command] [flags]\n\n")
 		fmt.Fprintf(os.Stderr, "Commands:\n")
 		fmt.Fprintf(os.Stderr, "  validate              Validate TAP-14 input\n")
-		fmt.Fprintf(os.Stderr, "  go-test [args...]     Run go test and convert output to TAP-14\n")
-		fmt.Fprintf(os.Stderr, "  cargo-test [args...]  Run cargo test and convert output to TAP-14\n")
+		fmt.Fprintf(os.Stderr, "  go-test [args...]     Run go test and convert output to TAP-14 or NDJSON\n")
+		fmt.Fprintf(os.Stderr, "  cargo-test [args...]  Run cargo test and convert output to TAP-14 or NDJSON\n")
 		fmt.Fprintf(os.Stderr, "  reformat              Read TAP from stdin and emit TAP-14 with ANSI colors\n")
 		fmt.Fprintf(os.Stderr, "  exec <cmd> [args...]  Run cmd for each arg sequentially and emit TAP-14\n")
 		fmt.Fprintf(os.Stderr, "  exec-parallel         Run commands in parallel and emit TAP-14\n")
@@ -160,8 +160,15 @@ func handleGoTest(ctx context.Context, args json.RawMessage) error {
 	verbose := fs.Bool("v", false, "")
 	fs.BoolVar(verbose, "verbose", false, "")
 	skipEmpty := fs.Bool("skip-empty", false, "")
+	format := fs.String("format", "tap", "")
+	split := fs.Bool("split", false, "")
+	passOut := fs.String("pass-out", "", "")
 	if err := fs.Parse(pt.Args); err != nil {
 		return err
+	}
+	if err := validateFormatFlags(*format, *split, *passOut); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(2)
 	}
 
 	goTestArgs := []string{"test", "-json"}
@@ -178,12 +185,29 @@ func handleGoTest(ctx context.Context, args json.RawMessage) error {
 		return fmt.Errorf("creating stdout pipe: %w", err)
 	}
 
-	color := stdoutIsTerminal()
+	// In NDJSON mode the TAP stream is parsed back through the reader,
+	// which strips ANSI; producing color in the intermediate TAP just
+	// wastes cycles. Force color off in that case.
+	color := stdoutIsTerminal() && *format == "tap"
 
 	if err := cmd.Start(); err != nil {
 		tw := writer.NewColorWriter(os.Stdout, color)
 		tw.BailOut("failed to start go test: %v", err)
 		return err
+	}
+
+	if *format == "ndjson" {
+		pr, pw := io.Pipe()
+		go func() {
+			gotest.ConvertGoTest(stdout, pw, *verbose, *skipEmpty, false)
+			cmd.Wait()
+			pw.Close()
+		}()
+		exit := emitNDJSON(pr, *split, *passOut)
+		if exit != 0 {
+			os.Exit(exit)
+		}
+		return nil
 	}
 
 	exitCode := gotest.ConvertGoTest(stdout, os.Stdout, *verbose, *skipEmpty, color)
@@ -210,8 +234,15 @@ func handleCargoTest(ctx context.Context, args json.RawMessage) error {
 	verbose := fs.Bool("v", false, "")
 	fs.BoolVar(verbose, "verbose", false, "")
 	skipEmpty := fs.Bool("skip-empty", false, "")
+	format := fs.String("format", "tap", "")
+	split := fs.Bool("split", false, "")
+	passOut := fs.String("pass-out", "", "")
 	if err := fs.Parse(pt.Args); err != nil {
 		return err
+	}
+	if err := validateFormatFlags(*format, *split, *passOut); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(2)
 	}
 
 	cargoArgs := []string{"test"}
@@ -232,12 +263,34 @@ func handleCargoTest(ctx context.Context, args json.RawMessage) error {
 		return fmt.Errorf("creating stdout pipe: %w", err)
 	}
 
-	color := stdoutIsTerminal()
+	color := stdoutIsTerminal() && *format == "tap"
 
 	if err := cmd.Start(); err != nil {
 		tw := writer.NewColorWriter(os.Stdout, color)
 		tw.BailOut("failed to start cargo test: %v", err)
 		return err
+	}
+
+	if *format == "ndjson" {
+		pr, pw := io.Pipe()
+		go func() {
+			exitCode := cargotest.ConvertCargoTest(stdout, pw, *verbose, *skipEmpty, false)
+			cmdErr := cmd.Wait()
+			if cmdErr != nil && exitCode == 0 {
+				msg := strings.TrimSpace(stderrBuf.String())
+				if msg == "" {
+					msg = cmdErr.Error()
+				}
+				tw := writer.NewWriter(pw)
+				tw.BailOut("cargo test failed: %s", msg)
+			}
+			pw.Close()
+		}()
+		exit := emitNDJSON(pr, *split, *passOut)
+		if exit != 0 {
+			os.Exit(exit)
+		}
+		return nil
 	}
 
 	exitCode := cargotest.ConvertCargoTest(stdout, os.Stdout, *verbose, *skipEmpty, color)
@@ -506,7 +559,39 @@ func handleFormatNDJSON(_ context.Context, args json.RawMessage) error {
 		os.Exit(2)
 	}
 
-	r := reader.NewReader(os.Stdin)
+	if exit := emitNDJSON(os.Stdin, *split, *passOut); exit != 0 {
+		os.Exit(exit)
+	}
+	return nil
+}
+
+// validateFormatFlags rejects flag combinations that the test-runner
+// subcommands (go-test, cargo-test) don't support.
+func validateFormatFlags(format string, split bool, passOut string) error {
+	switch format {
+	case "tap", "ndjson":
+		// supported
+	default:
+		return fmt.Errorf("--format %q (must be tap or ndjson)", format)
+	}
+	if format == "tap" && (split || passOut != "") {
+		return fmt.Errorf("--split and --pass-out require --format=ndjson")
+	}
+	if passOut != "" && !split {
+		return fmt.Errorf("--pass-out requires --split")
+	}
+	return nil
+}
+
+// emitNDJSON drains TAP events from in, builds NDJSON records via
+// ndjson.Aggregator, and writes them to stdout (and optionally to a
+// pass-out file in split mode). Returns the process exit code:
+//
+//	0 — no failures and no bailout
+//	1 — at least one failure seen, or Bail out! was emitted
+//	2 — tool-internal error (I/O failure, invalid combination)
+func emitNDJSON(in io.Reader, split bool, passOut string) int {
+	r := reader.NewReader(in)
 	agg := ndjson.NewAggregator()
 	for {
 		ev, err := r.Next()
@@ -515,48 +600,44 @@ func handleFormatNDJSON(_ context.Context, args json.RawMessage) error {
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error reading TAP: %v\n", err)
-			os.Exit(2)
+			return 2
 		}
 		agg.Consume(ev)
 	}
 	summary := r.Summary()
 	out := agg.Finalize(r.Diagnostics(), &summary)
 
-	if !*split {
+	if !split {
 		if err := ndjson.WriteAll(os.Stdout, out); err != nil {
 			fmt.Fprintf(os.Stderr, "error writing ndjson: %v\n", err)
-			os.Exit(2)
+			return 2
 		}
 	} else {
 		var passW io.Writer
 		passOutPath := ""
-		if *passOut != "" {
-			f, err := os.Create(*passOut)
+		if passOut != "" {
+			f, err := os.Create(passOut)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error opening --pass-out: %v\n", err)
-				os.Exit(2)
+				return 2
 			}
 			defer f.Close()
 			passW = f
-			passOutPath = *passOut
+			passOutPath = passOut
 		}
 		if err := ndjson.WriteSplit(os.Stdout, passW, out); err != nil {
-			// os.Exit does not run deferred functions, so the deferred
-			// f.Close() above is skipped. Remove the partial file
-			// explicitly so callers do not read truncated content.
 			if passOutPath != "" {
 				os.Remove(passOutPath)
 			}
 			fmt.Fprintf(os.Stderr, "error writing ndjson: %v\n", err)
-			os.Exit(2)
+			return 2
 		}
 	}
 
-	// Exit 1 if any failures or a bailout were seen.
 	if out.Summary.Failed > 0 || out.Summary.Bailed {
-		os.Exit(1)
+		return 1
 	}
-	return nil
+	return 0
 }
 
 func stdoutIsTerminal() bool {

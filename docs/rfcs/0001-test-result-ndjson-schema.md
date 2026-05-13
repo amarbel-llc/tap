@@ -200,9 +200,15 @@ Specifically:
   representation is unambiguously integer; otherwise as strings.
 - Nested mappings MUST be emitted as JSON objects.
 - Sequences MUST be emitted as JSON arrays.
-- ANSI SGR sequences in YAML scalar values MUST be preserved verbatim
-  in the emitted JSON strings (per the ANSI in YAML Output Blocks
-  amendment).
+- ANSI SGR sequences in YAML scalar values SHOULD be stripped before
+  emission. This is a deliberate divergence from the ANSI in YAML
+  Output Blocks amendment: YAML 1.2 parsers reject raw ESC (0x1B)
+  bytes as disallowed control characters, so preserving them through
+  programmatic YAML parsing is impractical. Producers consuming the
+  TAP wire format for display (e.g., `tap-dancer reformat`) MAY
+  preserve ANSI; producers emitting NDJSON for programmatic
+  consumption MUST strip ANSI to avoid downstream JSON consumers
+  needing to handle escape sequences in display logic.
 
 Producers MUST NOT emit a `diagnostic` field of type other than
 `object` or `null`. If a diagnostic block fails to parse as valid YAML,

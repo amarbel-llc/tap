@@ -16,15 +16,15 @@ import (
 // All fields are emitted unconditionally; nullable fields use
 // pointers/slices so they serialize as JSON null when absent.
 type TestRecord struct {
-	Type        string            `json:"type"`
-	N           int               `json:"n"`
-	Description string            `json:"description"`
-	OK          bool              `json:"ok"`
-	Directive   *DirectiveValue   `json:"directive"`
-	Diagnostic  map[string]string `json:"diagnostic"`
-	Output      *string           `json:"output"`
-	Subtest     []TestRecord      `json:"subtest"`
-	Line        int               `json:"line"`
+	Type        string          `json:"type"`
+	N           int             `json:"n"`
+	Description string          `json:"description"`
+	OK          bool            `json:"ok"`
+	Directive   *DirectiveValue `json:"directive"`
+	Diagnostic  map[string]any  `json:"diagnostic"`
+	Output      *string         `json:"output"`
+	Subtest     []TestRecord    `json:"subtest"`
+	Line        int             `json:"line"`
 }
 
 // DirectiveValue is the parsed test point directive.
@@ -146,11 +146,11 @@ func (a *Aggregator) Consume(ev diagnostic.Event) {
 	}
 }
 
-func copyMap(m map[string]string) map[string]string {
+func copyMap(m map[string]any) map[string]any {
 	if m == nil {
 		return nil
 	}
-	out := make(map[string]string, len(m))
+	out := make(map[string]any, len(m))
 	for k, v := range m {
 		out[k] = v
 	}

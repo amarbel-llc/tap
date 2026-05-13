@@ -99,11 +99,16 @@ func Replay(r io.Reader, tw *writer.Writer) (diagnostic.Summary, error) {
 // emitTestPoint writes one test point through tw, optionally with YAML
 // diagnostics, and updates summary counts. Description and directive come
 // from ev.TestPoint; if ev.TestPoint is nil the call is a no-op.
-func emitTestPoint(tw *writer.Writer, ev *diagnostic.Event, yaml map[string]string, summary *diagnostic.Summary) {
+//
+// The yaml map comes from the reader as map[string]any (possibly nested);
+// the writer takes map[string]string, so any nested structure is flattened
+// to its YAML round-trip via fmt.Sprintf.
+func emitTestPoint(tw *writer.Writer, ev *diagnostic.Event, yaml map[string]any, summary *diagnostic.Summary) {
 	if ev == nil || ev.TestPoint == nil {
 		return
 	}
 	tp := ev.TestPoint
+	flat := flattenYAML(yaml)
 	switch tp.Directive {
 	case diagnostic.DirectiveSkip:
 		if len(yaml) > 0 {
@@ -124,31 +129,68 @@ func emitTestPoint(tw *writer.Writer, ev *diagnostic.Event, yaml map[string]stri
 			}
 			summary.Passed++
 		} else {
-			tw.NotOk(tp.Description, yaml)
+			tw.NotOk(tp.Description, flat)
 			summary.Failed++
 		}
 	}
 	summary.TotalTests++
 }
 
-// yamlToDiagnostics converts a parsed YAML map (key→string) into a
-// *YAMLDiagnostic suitable for OkDiag/SkipDiag. Recognized keys populate
-// structured fields; every key (including the recognized ones) is also
-// mirrored into Extras so the diagnostic round-trips faithfully.
-func yamlToDiagnostics(yaml map[string]string) *yaml_diagnostic.YAMLDiagnostic {
+// flattenYAML projects the reader's map[string]any onto the writer's
+// map[string]string. Scalars become their default Go string form
+// (matching the prior reader's behavior); nested mappings and
+// sequences become their %v-formatted form. Used only as a bridge to
+// the writer's existing API; the original typed map is preserved
+// elsewhere.
+func flattenYAML(m map[string]any) map[string]string {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		switch v := v.(type) {
+		case string:
+			out[k] = v
+		default:
+			out[k] = fmt.Sprintf("%v", v)
+		}
+	}
+	return out
+}
+
+// yamlToDiagnostics converts a parsed YAML map into a *YAMLDiagnostic
+// suitable for OkDiag/SkipDiag. Recognized keys populate structured
+// fields; every key (including the recognized ones) is also mirrored
+// into Extras so the diagnostic round-trips faithfully.
+func yamlToDiagnostics(yaml map[string]any) *yaml_diagnostic.YAMLDiagnostic {
 	d := &yaml_diagnostic.YAMLDiagnostic{Extras: make(map[string]any, len(yaml))}
 	for k, v := range yaml {
 		switch k {
 		case "message":
-			d.Message = v
+			if s, ok := v.(string); ok {
+				d.Message = s
+			}
 		case "severity":
-			d.Severity = v
+			if s, ok := v.(string); ok {
+				d.Severity = s
+			}
 		case "file":
-			d.File = v
+			if s, ok := v.(string); ok {
+				d.File = s
+			}
 		case "line":
-			var n int
-			fmt.Sscanf(v, "%d", &n)
-			d.Line = n
+			switch n := v.(type) {
+			case int:
+				d.Line = n
+			case int64:
+				d.Line = int(n)
+			case uint64:
+				d.Line = int(n)
+			case float64:
+				d.Line = int(n)
+			case string:
+				fmt.Sscanf(n, "%d", &d.Line)
+			}
 		}
 		d.Extras[k] = v
 	}

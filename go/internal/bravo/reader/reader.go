@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
+	"gopkg.in/yaml.v3"
 
 	"github.com/amarbel-llc/tap/go/internal/0/classify"
 	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
@@ -50,7 +51,7 @@ type Reader struct {
 	diags            []diagnostic.Diagnostic
 	done             bool
 	bailed           bool
-	yamlBuf          map[string]string
+	yamlBuf          []string // raw YAML body lines (indent already stripped, ANSI preserved)
 	lastWasTestPoint bool
 	passed           int
 	failed           int
@@ -79,6 +80,39 @@ func localeGroupingSeparator(tag language.Tag) string {
 		return string(runes[1])
 	}
 	return ""
+}
+
+// parseYAMLBuffer parses r.yamlBuf as a YAML document. Returns nil
+// if the buffer is empty or fails to parse as a mapping; a parse
+// failure also records a diagnostic.
+//
+// The buffer holds raw body lines with the TAP indent prefix
+// already stripped, so they form a self-contained YAML document.
+//
+// ANSI SGR sequences in YAML values are stripped before parsing.
+// yaml.v3 rejects raw ESC (0x1B) bytes as disallowed control
+// characters; preserving them would require an escape/restore
+// dance that isn't worth the complexity for the consumers we
+// have (NDJSON, validate, MCP). This regresses the
+// ANSI-in-YAML-values aspect of the ANSI in YAML Output Blocks
+// amendment for callers that read through this Reader; the wire
+// format itself is unchanged.
+func (r *Reader) parseYAMLBuffer(_ int) map[string]any {
+	if len(r.yamlBuf) == 0 {
+		return nil
+	}
+	clean := make([]string, len(r.yamlBuf))
+	for i, line := range r.yamlBuf {
+		clean[i] = classify.StripANSI(line)
+	}
+	body := strings.Join(clean, "\n") + "\n"
+	var parsed map[string]any
+	if err := yaml.Unmarshal([]byte(body), &parsed); err != nil {
+		r.addDiag(diagnostic.SeverityError, "yaml-parse",
+			"failed to parse YAML diagnostic block: "+err.Error())
+		return nil
+	}
+	return parsed
 }
 
 func (r *Reader) addDiag(severity diagnostic.Severity, rule, message string) {
@@ -112,29 +146,25 @@ func (r *Reader) Next() (diagnostic.Event, error) {
 			expectedIndent := (r.currentFrame().depth * 4) + 2
 			if raw == strings.Repeat(" ", expectedIndent)+"..." {
 				r.state = stateBody
-				yaml := r.yamlBuf
+				parsed := r.parseYAMLBuffer(expectedIndent)
 				r.yamlBuf = nil
 				return diagnostic.Event{
 					Type:  diagnostic.EventYAMLDiagnostic,
 					Line:  r.lineNum,
 					Depth: r.currentFrame().depth,
 					Raw:   raw,
-					YAML:  yaml,
+					YAML:  parsed,
 				}, nil
 			}
-			// Accumulate YAML content using the original line to
-			// preserve ANSI SGR sequences in values, per the ANSI
-			// in YAML Output Blocks amendment.
+			// Buffer the raw body line with the TAP indent prefix
+			// stripped (preserving ANSI SGR sequences in values, per
+			// the ANSI in YAML Output Blocks amendment). The full YAML
+			// document is parsed once when the closing `...` arrives.
 			content := original
 			if len(content) >= expectedIndent {
 				content = content[expectedIndent:]
 			}
-			parts := strings.SplitN(content, ":", 2)
-			if len(parts) == 2 {
-				key := strings.TrimSpace(parts[0])
-				val := strings.TrimSpace(parts[1])
-				r.yamlBuf[key] = val
-			}
+			r.yamlBuf = append(r.yamlBuf, content)
 			continue
 		}
 
@@ -261,7 +291,7 @@ func (r *Reader) Next() (diagnostic.Event, error) {
 					"YAML block must be indented by "+strconv.Itoa(expectedIndent)+" spaces")
 			}
 			r.state = stateYAML
-			r.yamlBuf = make(map[string]string)
+			r.yamlBuf = nil
 			r.lastWasTestPoint = false
 			continue
 

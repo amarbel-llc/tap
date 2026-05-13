@@ -513,7 +513,13 @@ func TestReaderNoLocaleRejectsFormattedNumbers(t *testing.T) {
 	}
 }
 
-func TestReaderYAMLPreservesANSI(t *testing.T) {
+// TestReaderYAMLStripsANSIFromValues documents a deliberate regression
+// against the ANSI in YAML Output Blocks amendment: yaml.v3 (and
+// any YAML 1.2-conformant parser) rejects raw ESC (0x1B) bytes as
+// control characters, so the reader strips ANSI from YAML body
+// lines before parsing. The wire format is unchanged; this only
+// affects readers that consume `Event.YAML` programmatically.
+func TestReaderYAMLStripsANSIFromValues(t *testing.T) {
 	input := "TAP version 14\n1..1\nnot ok 1 - fail\n  ---\n  message: \033[31merror\033[0m text\n  ...\n"
 	events, diags, _ := collectEvents(input)
 
@@ -525,9 +531,9 @@ func TestReaderYAMLPreservesANSI(t *testing.T) {
 
 	for _, ev := range events {
 		if ev.Type == diagnostic.EventYAMLDiagnostic {
-			msg := ev.YAML["message"]
-			if msg != "\033[31merror\033[0m text" {
-				t.Errorf("expected ANSI preserved in YAML value, got %q", msg)
+			msg, _ := ev.YAML["message"].(string)
+			if msg != "error text" {
+				t.Errorf("expected ANSI stripped from YAML value, got %q", msg)
 			}
 			return
 		}
@@ -535,7 +541,7 @@ func TestReaderYAMLPreservesANSI(t *testing.T) {
 	t.Error("expected YAML diagnostic event")
 }
 
-func TestReaderYAMLStripsANSIFromProtocolButNotContent(t *testing.T) {
+func TestReaderYAMLStripsANSIFromProtocolAndContent(t *testing.T) {
 	input := "TAP version 14\n1..1\n\033[31mnot ok\033[0m 1 - fail\n  ---\n  output: \033[33mwarning\033[0m here\n  ...\n"
 	events, diags, summary := collectEvents(input)
 
@@ -555,9 +561,9 @@ func TestReaderYAMLStripsANSIFromProtocolButNotContent(t *testing.T) {
 			}
 		}
 		if ev.Type == diagnostic.EventYAMLDiagnostic {
-			output := ev.YAML["output"]
-			if output != "\033[33mwarning\033[0m here" {
-				t.Errorf("expected ANSI preserved in YAML output value, got %q", output)
+			output, _ := ev.YAML["output"].(string)
+			if output != "warning here" {
+				t.Errorf("expected ANSI stripped from YAML output value, got %q", output)
 			}
 		}
 	}

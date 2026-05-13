@@ -63,9 +63,88 @@ func TestIntegrationYAMLDiagnostic(t *testing.T) {
 	if len(out.Records) != 1 {
 		t.Fatalf("expected 1 record, got %d", len(out.Records))
 	}
-	if out.Records[0].Diagnostic["message"] != "broken" {
+	if msg, _ := out.Records[0].Diagnostic["message"].(string); msg != "broken" {
 		t.Errorf("diagnostic = %+v", out.Records[0].Diagnostic)
 	}
+}
+
+func TestIntegrationYAMLNestedAndTypedScalars(t *testing.T) {
+	input := "TAP version 14\n1..1\nnot ok 1 - parser\n" +
+		"  ---\n" +
+		"  message: assertion failed\n" +
+		"  severity: fail\n" +
+		"  location:\n" +
+		"    file: parser.rs\n" +
+		"    line: 87\n" +
+		"    column: 4\n" +
+		"  expected: 42\n" +
+		"  got: 41\n" +
+		"  hints:\n" +
+		"    - check rounding\n" +
+		"    - rerun with --verbose\n" +
+		"  ...\n"
+	out := runReader(t, input)
+	if len(out.Records) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(out.Records))
+	}
+	diag := out.Records[0].Diagnostic
+	if diag == nil {
+		t.Fatal("expected diagnostic to be populated")
+	}
+
+	// Top-level scalar string
+	if msg, _ := diag["message"].(string); msg != "assertion failed" {
+		t.Errorf("message = %v, want %q", diag["message"], "assertion failed")
+	}
+
+	// Nested mapping must be a JSON object (map), not a stringified blob
+	loc, ok := diag["location"].(map[string]any)
+	if !ok {
+		t.Fatalf("location should be a nested map, got %T: %v", diag["location"], diag["location"])
+	}
+	if f, _ := loc["file"].(string); f != "parser.rs" {
+		t.Errorf("location.file = %v, want %q", loc["file"], "parser.rs")
+	}
+	if line, _ := toInt(loc["line"]); line != 87 {
+		t.Errorf("location.line = %v (%T), want integer 87", loc["line"], loc["line"])
+	}
+
+	// Top-level typed integer scalars
+	if got, _ := toInt(diag["expected"]); got != 42 {
+		t.Errorf("expected = %v (%T), want integer 42", diag["expected"], diag["expected"])
+	}
+	if got, _ := toInt(diag["got"]); got != 41 {
+		t.Errorf("got = %v (%T), want integer 41", diag["got"], diag["got"])
+	}
+
+	// Sequence must round-trip as a slice
+	hints, ok := diag["hints"].([]any)
+	if !ok {
+		t.Fatalf("hints should be a slice, got %T: %v", diag["hints"], diag["hints"])
+	}
+	if len(hints) != 2 {
+		t.Fatalf("hints length = %d, want 2", len(hints))
+	}
+	if h, _ := hints[0].(string); h != "check rounding" {
+		t.Errorf("hints[0] = %v, want %q", hints[0], "check rounding")
+	}
+}
+
+// toInt normalizes the various numeric types yaml.v3 may yield (int, int64,
+// uint64) into a single int comparison. Callers must treat the bool result
+// as "this value was a recognized integer."
+func toInt(v any) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	case uint64:
+		return int(n), true
+	case float64:
+		return int(n), true
+	}
+	return 0, false
 }
 
 func TestIntegrationSubtest(t *testing.T) {

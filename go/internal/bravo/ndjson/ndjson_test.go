@@ -140,7 +140,7 @@ func TestAggregatorAttachesYAMLDiagnostic(t *testing.T) {
 		{Type: diagnostic.EventVersion, Line: 1, Depth: 0},
 		{Type: diagnostic.EventPlan, Line: 2, Depth: 0, Plan: &diagnostic.PlanResult{Count: 1}},
 		{Type: diagnostic.EventTestPoint, Line: 3, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 1, Description: "fail", OK: false}},
-		{Type: diagnostic.EventYAMLDiagnostic, Line: 6, Depth: 0, YAML: map[string]string{"message": "broken", "severity": "fail"}},
+		{Type: diagnostic.EventYAMLDiagnostic, Line: 6, Depth: 0, YAML: map[string]any{"message": "broken", "severity": "fail"}},
 	}
 
 	agg := NewAggregator()

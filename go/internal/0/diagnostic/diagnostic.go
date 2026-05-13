@@ -108,7 +108,7 @@ type Event struct {
 	TestPoint      *TestPointResult    `json:"test_point,omitempty"`
 	Plan           *PlanResult         `json:"plan,omitempty"`
 	BailOut        *BailOutResult      `json:"bail_out,omitempty"`
-	YAML           map[string]string   `json:"yaml,omitempty"`
+	YAML           map[string]any      `json:"yaml,omitempty"`
 	Comment        string              `json:"comment,omitempty"`
 	Pragma         *PragmaResult       `json:"pragma,omitempty"`
 	StreamedOutput bool                `json:"streamed_output,omitempty"`

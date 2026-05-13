@@ -66,15 +66,21 @@ type SummaryDiagnostic struct {
 // Call Consume for each event in order. Call Finalize once after
 // the stream is exhausted (typically at io.EOF from the reader).
 //
-// v1 limitation: subtests deeper than depth 1 collapse into the
-// depth-1 children slice; a follow-up issue tracks proper recursion.
+// Subtests nest to arbitrary depth. When a test point arrives at
+// depth N, any pending children at depth N+1 are embedded as that
+// record's Subtest array. Records at depth > 0 are themselves
+// buffered as pending children of their eventual parent at depth-1.
 type Aggregator struct {
-	records         []TestRecord
-	planCount       int
-	bailed          bool
-	bailout         *BailoutRecord
-	pendingOutput   *string      // accumulating Output Block body for the next top-level test point
-	pendingChildren []TestRecord // children seen at depth > 0 before parent test point arrives
+	records   []TestRecord
+	planCount int
+	bailed    bool
+	bailout   *BailoutRecord
+	// Accumulating Output Block body for the next top-level test point.
+	pendingOutput *string
+	// Children buffered at their own depth, keyed by that depth. The
+	// parent at depth-1 picks them up when it arrives. Initialized
+	// lazily on first append.
+	pendingChildren map[int][]TestRecord
 }
 
 // Output is the result of finalizing an aggregator.
@@ -86,7 +92,9 @@ type Output struct {
 
 // NewAggregator constructs an empty Aggregator ready to consume events.
 func NewAggregator() *Aggregator {
-	return &Aggregator{}
+	return &Aggregator{
+		pendingChildren: map[int][]TestRecord{},
+	}
 }
 
 // Consume feeds a single reader event into the aggregator.
@@ -100,20 +108,20 @@ func (a *Aggregator) Consume(ev diagnostic.Event) {
 		if ev.TestPoint == nil {
 			return
 		}
-		if ev.Depth > 0 {
-			a.pendingChildren = append(a.pendingChildren, buildTestRecord(ev))
-			return
-		}
 		rec := buildTestRecord(ev)
-		if a.pendingOutput != nil {
-			rec.Output = a.pendingOutput
-			a.pendingOutput = nil
+		if kids := a.pendingChildren[ev.Depth+1]; len(kids) > 0 {
+			rec.Subtest = kids
+			delete(a.pendingChildren, ev.Depth+1)
 		}
-		if len(a.pendingChildren) > 0 {
-			rec.Subtest = a.pendingChildren
-			a.pendingChildren = nil
+		if ev.Depth == 0 {
+			if a.pendingOutput != nil {
+				rec.Output = a.pendingOutput
+				a.pendingOutput = nil
+			}
+			a.records = append(a.records, rec)
+		} else {
+			a.pendingChildren[ev.Depth] = append(a.pendingChildren[ev.Depth], rec)
 		}
-		a.records = append(a.records, rec)
 	case diagnostic.EventYAMLDiagnostic:
 		if ev.Depth == 0 && len(a.records) > 0 {
 			a.records[len(a.records)-1].Diagnostic = copyMap(ev.YAML)

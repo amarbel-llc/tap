@@ -88,6 +88,42 @@ func TestIntegrationSubtest(t *testing.T) {
 	}
 }
 
+func TestIntegrationDeepSubtest(t *testing.T) {
+	input := "TAP version 14\n1..1\n" +
+		"    # Subtest: outer\n" +
+		"        # Subtest: inner\n" +
+		"        ok 1 - leaf\n" +
+		"        1..1\n" +
+		"    ok 1 - inner\n" +
+		"    1..1\n" +
+		"ok 1 - outer\n"
+	out := runReader(t, input)
+	if len(out.Records) != 1 {
+		t.Fatalf("expected 1 top-level record, got %d", len(out.Records))
+	}
+	outer := out.Records[0]
+	if outer.Description != "outer" {
+		t.Errorf("outer description = %q, want %q", outer.Description, "outer")
+	}
+	if len(outer.Subtest) != 1 {
+		t.Fatalf("expected outer.Subtest to have 1 child (inner), got %d: %+v", len(outer.Subtest), outer.Subtest)
+	}
+	inner := outer.Subtest[0]
+	if inner.Description != "inner" {
+		t.Errorf("inner description = %q, want %q", inner.Description, "inner")
+	}
+	if len(inner.Subtest) != 1 {
+		t.Fatalf("expected inner.Subtest to have 1 child (leaf), got %d: %+v", len(inner.Subtest), inner.Subtest)
+	}
+	leaf := inner.Subtest[0]
+	if leaf.Description != "leaf" {
+		t.Errorf("leaf description = %q, want %q", leaf.Description, "leaf")
+	}
+	if leaf.Subtest != nil {
+		t.Errorf("expected leaf.Subtest to be nil, got %+v", leaf.Subtest)
+	}
+}
+
 func TestIntegrationBailout(t *testing.T) {
 	input := "TAP version 14\n1..3\nok 1 - first\nBail out! disk full\n"
 	out := runReader(t, input)

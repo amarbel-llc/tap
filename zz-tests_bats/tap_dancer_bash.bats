@@ -80,3 +80,30 @@ function tap_run_streams_lines_before_test_point { # @test
   [ "$out1_line" -lt "$out2_line" ]
   [ "$out2_line" -lt "$tp_line" ]
 }
+
+function tap_run_output_roundtrips_through_go_validator { # @test
+  local tap_dancer="${TAP_DANCER_BIN:-tap-dancer}"
+  local script='source "$TAP_DANCER_LIB/load.bash"
+tap_run "echo hi" sh -c "echo hello; echo world"
+tap_run --no-bail "boom" sh -c "echo bad >&2; exit 7"
+tap_run "silent" true
+tap_plan 3'
+  local stream
+  stream=$(TAP_DANCER_LIB="$TAP_DANCER_LIB" bash -c "$script")
+
+  local report
+  report=$(printf '%s' "$stream" | "$tap_dancer" validate --format json)
+
+  local total passed failed valid diag_count
+  total=$(jq -r '.summary.total_tests' <<<"$report")
+  passed=$(jq -r '.summary.passed' <<<"$report")
+  failed=$(jq -r '.summary.failed' <<<"$report")
+  valid=$(jq -r '.summary.valid' <<<"$report")
+  diag_count=$(jq -r '.diagnostics | length // 0' <<<"$report")
+
+  [ "$total" = "3" ]
+  [ "$passed" = "2" ]
+  [ "$failed" = "1" ]
+  [ "$valid" = "true" ]
+  [ "$diag_count" = "0" ]
+}

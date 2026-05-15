@@ -6,6 +6,9 @@ default: build test
 build:
     nix build
 
+# Alias for spinclass pre-merge hook
+build-nix: build
+
 build-cli:
     nix build .#tap-dancer-go
 

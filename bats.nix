@@ -17,6 +17,7 @@
   pkgs,
   bats-libs,
   tap-dancer-go,
+  tap-dancer-bash,
   batsSrc,
   batsTestTimeout ? "10",
 }:
@@ -42,6 +43,7 @@ let
       batsLibPath = [ bats-libs.batsLibPath ];
       extraEnv = {
         BATS_TEST_TIMEOUT = batsTestTimeout;
+        TAP_DANCER_LIB = "${tap-dancer-bash}/share/tap-dancer/lib";
       };
       nativeBuildInputs = [ pkgs.jq ];
     };

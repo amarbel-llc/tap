@@ -24,8 +24,9 @@ test-rust:
     {{cmd_nix_dev}} bash -c 'cd rust && cargo test'
 
 # Requires built CLI on disk at result/bin/tap-dancer
-test-bats: build-cli
+test-bats: build
     TAP_DANCER_BIN=$PWD/result/bin/tap-dancer \
+    TAP_DANCER_LIB=$PWD/result/share/tap-dancer/lib \
       {{cmd_nix_dev}} bats zz-tests_bats/
 
 # Run the bats suite as a nix derivation (`bats-default` lane). Same

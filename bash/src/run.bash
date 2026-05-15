@@ -10,14 +10,18 @@ tap_run() {
 
   _tap_test_num=$((_tap_test_num + 1))
 
-  local output
-  if output="$("$@" 2>&1)"; then
+  echo "# Output: ${_tap_test_num} - ${desc}"
+
+  "$@" 2>&1 | awk '{ print "    " $0; fflush() }'
+  local status=${PIPESTATUS[0]}
+
+  if [[ $status -eq 0 ]]; then
     echo "ok ${_tap_test_num} - ${desc}"
   else
     echo "not ok ${_tap_test_num} - ${desc}"
     echo "  ---"
-    echo "  output: |"
-    echo "${output}" | sed 's/^/    /'
+    echo "  severity: fail"
+    echo "  exitcode: ${status}"
     echo "  ..."
     if [[ $bail -eq 1 ]]; then
       tap_bail_out "${desc} failed"

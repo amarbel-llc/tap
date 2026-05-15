@@ -21,3 +21,4 @@ _tap_existing_exit_trap="$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")"
 trap "${_tap_existing_exit_trap:+${_tap_existing_exit_trap}; }_tap_trailing_plan" EXIT
 
 echo "TAP version 14"
+echo "pragma +streamed-output"

@@ -143,7 +143,7 @@
         # for every `# bats file_tags=` directive found in zz-tests_bats).
         # See bats.nix for the auto-discovery rules.
         batsLib = import ./bats.nix {
-          inherit pkgs bats-libs tap-dancer-go;
+          inherit pkgs bats-libs tap-dancer-go tap-dancer-bash;
           batsSrc = tests-src;
         };
       in

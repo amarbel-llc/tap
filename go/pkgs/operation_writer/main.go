@@ -8,6 +8,4 @@ type (
 	OperationWriter = internal.OperationWriter
 )
 
-var (
-	NewOperationWriter = internal.NewOperationWriter
-)
+var NewOperationWriter = internal.NewOperationWriter

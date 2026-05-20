@@ -21,10 +21,10 @@ require_bin() {
   local var="$1" name="$2"
   local val
   val="${!var:-}"
-  if [[ -z "$val" ]]; then
+  if [[ -z $val ]]; then
     val=$(command -v "$name" || true)
   fi
-  if [[ -z "$val" || ! -x "$val" ]]; then
+  if [[ -z $val || ! -x $val ]]; then
     echo "missing $name (set $var or put on PATH)" >&2
     return 1
   fi

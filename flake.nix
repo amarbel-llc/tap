@@ -11,6 +11,10 @@
 
     utils.url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
 
+    # `nix fmt` entry point. Config lives in ./treefmt.nix.
+    treefmt-nix.url = "github:numtide/treefmt-nix";
+    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+
     # gomod2nix (devshell tool — generates go/gomod2nix.toml).
     gomod2nix = {
       url = "github:amarbel-llc/gomod2nix";
@@ -47,6 +51,7 @@
       crane,
       rust-overlay,
       bats,
+      treefmt-nix,
     }:
     utils.lib.eachDefaultSystem (
       system:
@@ -143,9 +148,16 @@
         # for every `# bats file_tags=` directive found in zz-tests_bats).
         # See bats.nix for the auto-discovery rules.
         batsLib = import ./bats.nix {
-          inherit pkgs bats-libs tap-dancer-go tap-dancer-bash;
+          inherit
+            pkgs
+            bats-libs
+            tap-dancer-go
+            tap-dancer-bash
+            ;
           batsSrc = tests-src;
         };
+
+        treefmtEval = treefmt-nix.lib.evalModule pkgs ./treefmt.nix;
       in
       {
         packages = {
@@ -161,7 +173,10 @@
 
         checks = {
           tap-tests = batsLib.batsLaneOutputs.bats-default;
+          formatting = treefmtEval.config.build.check self;
         };
+
+        formatter = treefmtEval.config.build.wrapper;
 
         devShells.default = pkgs-master.mkShell {
           packages = [
@@ -182,7 +197,6 @@
             pkgs.shfmt
 
             pkgs.just
-            pkgs.nixfmt-rfc-style
 
             # Used by the `release` recipe.
             pkgs.gh

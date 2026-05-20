@@ -4,6 +4,4 @@ package replay
 
 import internal "github.com/amarbel-llc/tap/go/internal/charlie/replay"
 
-var (
-	Replay = internal.Replay
-)
+var Replay = internal.Replay

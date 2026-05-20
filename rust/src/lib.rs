@@ -140,11 +140,7 @@ impl<'a> TapWriterBuilder<'a> {
 }
 
 fn status_ok(color: bool) -> &'static str {
-    if color {
-        "\x1b[32mok\x1b[0m"
-    } else {
-        "ok"
-    }
+    if color { "\x1b[32mok\x1b[0m" } else { "ok" }
 }
 
 fn status_not_ok(color: bool) -> &'static str {
@@ -156,19 +152,11 @@ fn status_not_ok(color: bool) -> &'static str {
 }
 
 fn directive_skip(color: bool) -> &'static str {
-    if color {
-        "\x1b[33mSKIP\x1b[0m"
-    } else {
-        "SKIP"
-    }
+    if color { "\x1b[33mSKIP\x1b[0m" } else { "SKIP" }
 }
 
 fn directive_todo(color: bool) -> &'static str {
-    if color {
-        "\x1b[33mTODO\x1b[0m"
-    } else {
-        "TODO"
-    }
+    if color { "\x1b[33mTODO\x1b[0m" } else { "TODO" }
 }
 
 fn token_bail_out(color: bool) -> &'static str {
@@ -547,7 +535,7 @@ fn strip_non_sgr_csi(s: &str) -> String {
             // Found CSI sequence start, collect the whole sequence
             let start = i;
             i += 2; // skip ESC [
-                    // Skip parameter bytes (digits and semicolons)
+            // Skip parameter bytes (digits and semicolons)
             while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] == b';') {
                 i += 1;
             }

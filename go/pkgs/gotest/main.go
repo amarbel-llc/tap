@@ -4,6 +4,4 @@ package gotest
 
 import internal "github.com/amarbel-llc/tap/go/internal/charlie/gotest"
 
-var (
-	ConvertGoTest = internal.ConvertGoTest
-)
+var ConvertGoTest = internal.ConvertGoTest

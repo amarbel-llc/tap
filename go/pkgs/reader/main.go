@@ -8,6 +8,4 @@ type (
 	Reader = internal.Reader
 )
 
-var (
-	NewReader = internal.NewReader
-)
+var NewReader = internal.NewReader

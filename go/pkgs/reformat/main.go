@@ -4,6 +4,4 @@ package reformat
 
 import internal "github.com/amarbel-llc/tap/go/internal/alfa/reformat"
 
-var (
-	ReformatTAP = internal.ReformatTAP
-)
+var ReformatTAP = internal.ReformatTAP

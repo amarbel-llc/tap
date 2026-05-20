@@ -45,10 +45,8 @@ test-bats-default:
 test-bats-tags *tags:
     nix build --print-build-logs --no-link .#bats-{{tags}}
 
-fmt:
-    {{cmd_nix_dev}} bash -c 'cd go && gofumpt -w .'
-    {{cmd_nix_dev}} bash -c 'cd rust && cargo fmt'
-    {{cmd_nix_dev}} nixfmt flake.nix
+fmt *ARGS:
+    nix fmt -- {{ARGS}}
 
 lint:
     {{cmd_nix_dev}} bash -c 'cd go && go vet ./...'

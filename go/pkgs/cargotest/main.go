@@ -4,6 +4,4 @@ package cargotest
 
 import internal "github.com/amarbel-llc/tap/go/internal/charlie/cargotest"
 
-var (
-	ConvertCargoTest = internal.ConvertCargoTest
-)
+var ConvertCargoTest = internal.ConvertCargoTest

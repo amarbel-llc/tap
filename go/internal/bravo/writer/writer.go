@@ -13,8 +13,8 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 
 	"github.com/amarbel-llc/tap/go/internal/0/style"
 	"github.com/amarbel-llc/tap/go/internal/alfa/yaml_diagnostic"

@@ -3,7 +3,7 @@ module github.com/amarbel-llc/tap/go
 go 1.26
 
 require (
-	github.com/amarbel-llc/purse-first/libs/dewey v0.1.0
+	github.com/amarbel-llc/purse-first/libs/dewey v0.1.8
 	github.com/amarbel-llc/purse-first/libs/go-mcp v0.0.9
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/muesli/termenv v0.16.0

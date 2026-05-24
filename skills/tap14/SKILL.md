@@ -18,22 +18,24 @@ Use TAP-14 output when building:
 
 ## Go Library
 
-Import: `github.com/amarbel-llc/bob/packages/tap-dancer/go`
+Module: `github.com/amarbel-llc/tap/go`
+Public package: `github.com/amarbel-llc/tap/go/pkgs/writer` (other consumer-facing packages live alongside under `pkgs/`: `reader`, `replay`, `reformat`, `ndjson`, `gotest`, `cargotest`, `diagnostic`, `yaml_diagnostic`).
 
 ### Basic Usage
 
 ```go
 import (
     "os"
-    tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
+
+    "github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 
 func main() {
-    tw := tap.NewWriter(os.Stdout)  // Emits: TAP version 14
-    tw.PlanAhead(3)                  // Emits: 1..3
+    tw := writer.NewWriter(os.Stdout)  // Emits: TAP version 14
+    tw.PlanAhead(3)                    // Emits: 1..3
 
-    tw.Ok("database connected")      // Emits: ok 1 - database connected
-    tw.Ok("schema validated")        // Emits: ok 2 - schema validated
+    tw.Ok("database connected")        // Emits: ok 1 - database connected
+    tw.Ok("schema validated")          // Emits: ok 2 - schema validated
     tw.NotOk("migration failed", map[string]string{
         "message":  "column 'name' already exists",
         "severity": "fail",
@@ -52,14 +54,20 @@ func main() {
 | Method | Output | Returns |
 |--------|--------|---------|
 | `NewWriter(w)` | `TAP version 14` | `*Writer` |
-| `Ok(desc)` | `ok N - desc` | test number |
-| `NotOk(desc, diag)` | `not ok N - desc` + optional YAML block | test number |
-| `Skip(desc, reason)` | `ok N - desc # SKIP reason` | test number |
-| `Todo(desc, reason)` | `not ok N - desc # TODO reason` | test number |
-| `PlanAhead(n)` | `1..n` (before tests) | — |
-| `Plan()` | `1..n` (after tests, n = count) | — |
-| `BailOut(reason)` | `Bail out! reason` | — |
-| `Comment(text)` | `# text` | — |
+| `NewColorWriter(w, color)` | `TAP version 14` (status tokens optionally ANSI-colored) | `*Writer` |
+| `NewLocaleWriter(w, locale)` | `TAP version 14` + `pragma +locale-formatting:<locale>` | `*Writer` |
+| `tw.Ok(desc)` | `ok N - desc` | test number |
+| `tw.NotOk(desc, map[string]string)` | `not ok N - desc` + optional YAML block | test number |
+| `tw.Skip(desc, reason)` | `ok N - desc # SKIP reason` | test number |
+| `tw.Todo(desc, reason)` | `not ok N - desc # TODO reason` | test number |
+| `tw.PlanAhead(n)` | `1..n` (before tests) | — |
+| `tw.Plan()` | `1..n` (after tests, n = count; idempotent) | — |
+| `tw.BailOut(format, args...)` | `Bail out! <formatted>` | — |
+| `tw.Comment(format, args...)` | `# <formatted>` | — |
+| `tw.Pragma(key, enabled)` | `pragma +key` / `pragma -key` | — |
+| `tw.Subtest(format, args...)` | `# Subtest: <name>` + child writer (4-space indented) | `*Writer` |
+| `tw.OutputBlock(desc, fn)` | streamed `# Output:` block + ok/not ok | test number |
+| `tw.HasFailures()` | — | `true` if any `NotOk` emitted |
 
 ### YAML Diagnostics
 
@@ -80,7 +88,7 @@ Pass `nil` to omit the YAML block entirely.
 When the total test count is unknown upfront, emit the plan after all tests:
 
 ```go
-tw := tap.NewWriter(os.Stdout)
+tw := writer.NewWriter(os.Stdout)
 tw.Ok("step one")
 tw.Ok("step two")
 tw.Plan()  // Emits: 1..2
@@ -94,73 +102,89 @@ Crate: `tap-dancer`
 
 ```rust
 use std::io;
-use tap_dancer::{write_version, write_plan, write_test_point, TestResult, TapWriter};
+use tap_dancer::TapWriterBuilder;
 
 fn main() -> io::Result<()> {
-    let stdout = &mut io::stdout();
-    let mut tw = TapWriter::new();
+    let stdout = io::stdout();
+    let mut handle = stdout.lock();
+    let mut tw = TapWriterBuilder::new(&mut handle).build()?;  // Emits: TAP version 14
+    tw.plan_ahead(3)?;                                          // Emits: 1..3
 
-    write_version(stdout)?;
-    write_plan(stdout, 3)?;
-
-    let n = tw.next();
-    write_test_point(stdout, &TestResult {
-        number: n,
-        name: "database connected".into(),
-        ok: true,
-        error_message: None,
-        exit_code: None,
-        output: None,
-    })?;
-
-    let n = tw.next();
-    write_test_point(stdout, &TestResult {
-        number: n,
-        name: "migration failed".into(),
-        ok: false,
-        error_message: Some("column already exists".into()),
-        exit_code: Some(1),
-        output: None,
-    })?;
-
-    let n = tw.next();
-    tap_dancer::write_skip(stdout, n, "optional feature", "not supported")?;
-
+    tw.ok("database connected")?;                               // Emits: ok 1 - database connected
+    tw.ok("schema validated")?;                                 // Emits: ok 2 - schema validated
+    tw.not_ok_diag("migration failed", &[
+        ("message", "column 'name' already exists"),
+        ("severity", "fail"),
+    ])?;
+    // Emits:
+    // not ok 3 - migration failed
+    //   ---
+    //   message: column 'name' already exists
+    //   severity: fail
+    //   ...
     Ok(())
 }
 ```
 
 ### API Reference
 
-| Function | Output |
-|----------|--------|
-| `write_version(w)` | `TAP version 14` |
-| `write_plan(w, n)` | `1..n` |
-| `write_test_point(w, result)` | `ok/not ok N - name` + optional YAML |
-| `write_skip(w, n, desc, reason)` | `ok N - desc # SKIP reason` |
-| `write_todo(w, n, desc, reason)` | `not ok N - desc # TODO reason` |
-| `write_bail_out(w, reason)` | `Bail out! reason` |
-| `write_comment(w, text)` | `# text` |
+| Method | Output | Returns |
+|--------|--------|---------|
+| `TapWriterBuilder::new(w).build()?` | `TAP version 14` | `TapWriter` |
+| `TapWriterBuilder::auto(w).build()?` | version + locale/color from env | `TapWriter` |
+| `tw.ok(desc)?` | `ok N - desc` | test number |
+| `tw.not_ok(desc)?` | `not ok N - desc` | test number |
+| `tw.not_ok_diag(desc, &[(k, v), ...])?` | `not ok N - desc` + YAML block | test number |
+| `tw.skip(desc, reason)?` | `ok N - desc # SKIP reason` | test number |
+| `tw.todo(desc, reason)?` | `not ok N - desc # TODO reason` | test number |
+| `tw.plan_ahead(n)?` | `1..n` (before tests) | — |
+| `tw.plan()?` | `1..n` (after tests, n = count) | — |
+| `tw.bail_out(reason)?` | `Bail out! reason` | — |
+| `tw.comment(text)?` | `# text` | — |
+| `tw.pragma(key, enabled)?` | `pragma +key` / `pragma -key` | — |
+| `tw.count()` | — | current test count |
+| `tw.has_failures()` | — | `true` if any `not_ok` emitted |
 
-### TapWriter Counter
+### Builder Options
 
-Use `TapWriter` for sequential numbering:
+`TapWriterBuilder` is chainable:
 
 ```rust
-let mut tw = TapWriter::new();
-let n = tw.next();  // 1
-let n = tw.next();  // 2
-tw.count()          // 2
+let mut tw = TapWriterBuilder::new(&mut w)
+    .color(true)                // wrap status tokens in ANSI SGR
+    .locale("de-DE".parse()?)   // BCP 47 locale for number formatting
+    .tty_build_last_line(true)  // emit pragma +tty-build-last-line
+    .build()?;
 ```
 
-### YAML Diagnostics in TestResult
+`TapWriterBuilder::auto(w)` is shorthand for `new(w).default_color().default_locale()`, which respects `NO_COLOR` and `LC_ALL` / `LC_NUMERIC` / `LANG`.
 
-Set fields on `TestResult` to generate YAML diagnostic blocks:
-- `error_message` → `message: "..."` (quoted)
-- `exit_code` → `exitcode: N`
-- `output` → `output: |` (block scalar for multiline)
-- Failing tests (`ok: false`) automatically get `severity: fail`
-- Passing tests with `output` set also get a YAML block
+`build_without_printing()` produces a writer without emitting the version line, useful for testing or for stitching into an existing stream.
+
+### YAML Diagnostics
+
+Pass `&[(key, value), ...]` to `not_ok_diag` for structured failure info. Keys are emitted in the order given. Multiline values automatically use YAML block scalar (`|`) format:
+
+```rust
+tw.not_ok_diag("compile failed", &[
+    ("exitcode", "1"),
+    ("message",  "syntax error on line 42"),
+    ("output",   "error: unexpected token\n  at main.go:42:5"),
+])?;
+```
+
+Use `not_ok` (no `_diag`) to omit the YAML block entirely.
+
+### Trailing Plan
+
+When the total test count is unknown upfront, emit the plan after all tests:
+
+```rust
+let mut tw = TapWriterBuilder::new(&mut w).build()?;
+tw.ok("step one")?;
+tw.ok("step two")?;
+tw.plan()?;  // Emits: 1..2
+```
 
 ## TAP-14 Quick Reference
 

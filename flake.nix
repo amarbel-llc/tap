@@ -77,7 +77,7 @@
 
         goModule = import ./go/gomod.nix {
           inherit pkgs self version;
-          go = pkgs-master.go;
+          go = pkgs.go_1_26;
         };
         inherit (goModule) tap-dancer-go;
 

@@ -6,8 +6,13 @@ default: build test
 build:
     nix build
 
-# Alias for spinclass pre-merge hook
+# Used by the spinclass pre-merge hook. Builds the default package
+# AND runs `nix flake check` so flake-schema regressions (e.g. the
+# go-pkgs/derivation class — see #23, nixpkgs#38/#44) and lane
+# breakage (e.g. #26 — bats-default failing at eval) are caught before
+# merge instead of after the fact.
 build-nix: build
+    nix flake check
 
 build-cli:
     nix build .#tap-dancer-go

@@ -68,6 +68,16 @@ let
 
   batsFiles = lib.filter (f: lib.hasSuffix ".bats" f) (builtins.attrNames (builtins.readDir batsSrc));
 
+  # Trim leading/trailing ASCII whitespace from a string. Used so a
+  # stray space after a comma in `# bats file_tags=a, b` doesn't produce
+  # a derivation named `bats- b`.
+  trimWhitespace =
+    s:
+    let
+      m = builtins.match "[[:space:]]*(.*[^[:space:]]|)[[:space:]]*" s;
+    in
+    if m == null then s else builtins.head m;
+
   extractFileTags =
     file:
     let
@@ -78,7 +88,9 @@ let
     if tagLines == [ ] then
       [ ]
     else
-      lib.splitString "," (lib.removePrefix "# bats file_tags=" (builtins.head tagLines));
+      map trimWhitespace (
+        lib.splitString "," (lib.removePrefix "# bats file_tags=" (builtins.head tagLines))
+      );
 
   allFileTags = lib.unique (lib.concatMap extractFileTags batsFiles);
 

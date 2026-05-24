@@ -154,7 +154,20 @@
             tap-dancer-go
             tap-dancer-bash
             ;
+          # batsLane migrated out of amarbel-llc/nixpkgs's overlay into
+          # amarbel-llc/bats — see amarbel-llc/nixpkgs#16. tap consumes
+          # it from the bats flake input now.
+          batsLane = bats.lib.${system}.batsLane;
+          # Same go that builds tap-dancer-go, so the bats sandbox runs
+          # `go test` against the same toolchain as the real binary.
+          go = pkgs-master.go;
           batsSrc = tests-src;
+          # 10s (the bats.nix default and zz-tests_bats/justfile's value)
+          # is too aggressive for the nix sandbox, where
+          # test_runners_ndjson.bats's per-test `go test` invocations
+          # compile stdlib from cold. 60s gives generous margin over
+          # the ~5s/test we actually observe.
+          batsTestTimeout = "60";
         };
 
         treefmtEval = treefmt-nix.lib.evalModule pkgs ./treefmt.nix;

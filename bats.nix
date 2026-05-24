@@ -1,8 +1,10 @@
 # bats integration test lanes for tap-dancer.
 #
-# Wraps `pkgs.testers.batsLane` (provided by the amarbel-llc/nixpkgs
-# overlay — see amarbel-llc/nixpkgs#14) with tap-dancer-specific
-# defaults: `bats-libs` from amarbel-llc/bats on `BATS_LIB_PATH`,
+# Wraps `batsLane` (provided by amarbel-llc/bats's `lib.${system}.batsLane`
+# — see amarbel-llc/nixpkgs#14 for the design rationale and the
+# nixpkgs#16 follow-up that migrated the builder out of the nixpkgs
+# overlay into amarbel-llc/bats) with tap-dancer-specific defaults:
+# `bats-libs` from amarbel-llc/bats on `BATS_LIB_PATH`,
 # `TAP_DANCER_BIN` exported via the `binaries` map form, and a
 # `BATS_TEST_TIMEOUT` mirroring `zz-tests_bats/justfile`.
 #
@@ -15,6 +17,8 @@
 # auto-discovered. Use `mkBatsLane` directly for ad-hoc filters.
 {
   pkgs,
+  go,
+  batsLane,
   bats-libs,
   tap-dancer-go,
   tap-dancer-bash,
@@ -32,7 +36,7 @@ let
       filter ? "",
       base ? tap-dancer-go,
     }:
-    pkgs.testers.batsLane {
+    batsLane {
       inherit base filter batsSrc;
       binaries = {
         TAP_DANCER_BIN = {
@@ -44,8 +48,22 @@ let
       extraEnv = {
         BATS_TEST_TIMEOUT = batsTestTimeout;
         TAP_DANCER_LIB = "${tap-dancer-bash}/share/tap-dancer/lib";
+        # `go test` invoked from zz-tests_bats/test_runners_ndjson.bats
+        # would otherwise see `go 1.26` in the fixture go.mod and try
+        # to download a matching toolchain from the network — which
+        # the nix sandbox blocks, leading to test timeouts. Match
+        # tap-dancer-go's own setting (flake.nix).
+        GOTOOLCHAIN = "local";
       };
-      nativeBuildInputs = [ pkgs.jq ];
+      # `go` is needed by zz-tests_bats/test_runners_ndjson.bats, which
+      # builds a tiny Go module on the fly and runs `tap-dancer go-test`
+      # against it. Outside the nix sandbox the devshell already
+      # provides Go, but inside the sandbox the toolchain has to be
+      # threaded through nativeBuildInputs explicitly.
+      nativeBuildInputs = [
+        pkgs.jq
+        go
+      ];
     };
 
   batsFiles = lib.filter (f: lib.hasSuffix ".bats" f) (builtins.attrNames (builtins.readDir batsSrc));

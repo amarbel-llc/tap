@@ -176,22 +176,14 @@
           # because tap is polyglot — the default keep-set anchors
           # `go.mod`/`go.sum`/`gomod2nix.toml` at the source root.
           # Consumers wire this via `subPath = "go"`.
-          #
-          # The `runCommandLocal` wrap turns the goSourceFilter path
-          # into a real derivation so the output passes `nix flake
-          # check`'s `isDerivation` predicate, not just `nix build`.
-          # Drop the wrap when amarbel-llc/nixpkgs#44 lands and
-          # goSourceFilter itself returns a derivation.
-          go-pkgs = pkgs.runCommandLocal "tap-go-pkgs" { } ''
-            cp -r ${pkgs.goSourceFilter {
-              src = self;
-              extras = [
-                "^go/go\\.mod$"
-                "^go/go\\.sum$"
-                "^go/gomod2nix\\.toml$"
-              ];
-            }}/. $out
-          '';
+          go-pkgs = pkgs.goSourceFilter {
+            src = self;
+            extras = [
+              "^go/go\\.mod$"
+              "^go/go\\.sum$"
+              "^go/gomod2nix\\.toml$"
+            ];
+          };
         }
         // batsLib.batsLaneOutputs;
 

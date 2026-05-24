@@ -6,7 +6,10 @@
     # gomod2nix's buildGoApplication / mkGoEnv on top of upstream.
     nixpkgs.url = "github:amarbel-llc/nixpkgs";
 
-    # Master nixpkgs pinned for go_1_26 (fork doesn't track master).
+    # Master nixpkgs pinned for the devshell's Go tooling
+    # (gofumpt/gopls/golangci-lint). Go itself comes from the fork's
+    # `pkgs.go_1_26` (1.26.3); nixpkgs-master can be dropped once the
+    # fork's master tracks an equivalent set of Go tools.
     nixpkgs-master.url = "github:NixOS/nixpkgs/d233902339c02a9c334e7e593de68855ad26c4cb";
 
     utils.url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
@@ -150,7 +153,7 @@
           batsLane = bats.lib.${system}.batsLane;
           # Same go that builds tap-dancer-go, so the bats sandbox runs
           # `go test` against the same toolchain as the real binary.
-          go = pkgs-master.go;
+          go = pkgs.go_1_26;
           batsSrc = tests-src;
           # 10s (the bats.nix default and zz-tests_bats/justfile's value)
           # is too aggressive for the nix sandbox, where
@@ -185,7 +188,6 @@
         devShells.default = pkgs-master.mkShell {
           packages = [
             (pkgs.mkGoEnv { pwd = ./go; })
-            pkgs-master.go
             pkgs-master.gofumpt
             pkgs-master.gopls
             pkgs-master.golangci-lint

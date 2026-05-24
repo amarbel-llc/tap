@@ -75,21 +75,11 @@
         # `source` it and Nix can parse it without an extra dependency.
         version = builtins.elemAt (builtins.match "^VERSION=([^\n]+)\n?$" (builtins.readFile ./version.env)) 0;
 
-        tap-dancer-go = pkgs.buildGoApplication {
-          pname = "tap-dancer";
-          inherit version;
-          src = ./go;
-          pwd = ./go;
-          subPackages = [ "cmd/tap-dancer" ];
-          modules = ./go/gomod2nix.toml;
+        goModule = import ./go/gomod.nix {
+          inherit pkgs self version;
           go = pkgs-master.go;
-          GOTOOLCHAIN = "local";
-          meta = with pkgs.lib; {
-            description = "TAP-14 validator and writer toolkit";
-            homepage = "https://github.com/amarbel-llc/tap";
-            license = licenses.mit;
-          };
         };
+        inherit (goModule) tap-dancer-go;
 
         rustSrc = craneLib.cleanCargoSource ./rust;
         rustCommonArgs = {
@@ -181,22 +171,7 @@
             tap-dancer-rust
             tap-dancer-bash
             ;
-          # flake-input-go_mod producer half (amarbel-llc/nixpkgs
-          # RFC 0001). Publishes a filtered view of `self` containing
-          # only Go-relevant files so consumers (e.g. madder) don't
-          # re-hash bash/, rust/, docs, or treefmt config when those
-          # change. `extras` keeps the module manifests under `go/`
-          # because tap is polyglot — the default keep-set anchors
-          # `go.mod`/`go.sum`/`gomod2nix.toml` at the source root.
-          # Consumers wire this via `subPath = "go"`.
-          go-pkgs = pkgs.goSourceFilter {
-            src = self;
-            extras = [
-              "^go/go\\.mod$"
-              "^go/go\\.sum$"
-              "^go/gomod2nix\\.toml$"
-            ];
-          };
+          inherit (goModule) go-pkgs go-pkgs-test;
         }
         // batsLib.batsLaneOutputs;
 

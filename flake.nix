@@ -21,7 +21,6 @@
     # gomod2nix (devshell tool — generates go/gomod2nix.toml).
     gomod2nix = {
       url = "github:amarbel-llc/gomod2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Rust build (crane) + stable toolchain (rust-overlay).

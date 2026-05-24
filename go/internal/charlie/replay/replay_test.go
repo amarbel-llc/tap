@@ -141,6 +141,37 @@ func TestReplayBailOut(t *testing.T) {
 	}
 }
 
+func TestReplayPassesThroughPragmas(t *testing.T) {
+	input := strings.Join([]string{
+		"TAP version 14",
+		"pragma +locale-formatting:de-DE",
+		"ok 1 - work",
+		"1..1",
+		"",
+	}, "\n")
+	out, _, _ := replayInto(t, input)
+	if !strings.Contains(out, "pragma +locale-formatting:de-DE\n") {
+		t.Errorf("expected pragma to be re-emitted, got: %q", out)
+	}
+	if !strings.Contains(out, "ok 1 - work\n") {
+		t.Errorf("expected subsequent test point, got: %q", out)
+	}
+}
+
+func TestReplayPassesThroughStreamedOutputPragma(t *testing.T) {
+	input := strings.Join([]string{
+		"TAP version 14",
+		"pragma +streamed-output",
+		"ok 1 - work",
+		"1..1",
+		"",
+	}, "\n")
+	out, _, _ := replayInto(t, input)
+	if !strings.Contains(out, "pragma +streamed-output\n") {
+		t.Errorf("expected streamed-output pragma to be re-emitted, got: %q", out)
+	}
+}
+
 func TestReplayDepthGreaterThanZeroEmitsWarning(t *testing.T) {
 	input := strings.Join([]string{
 		"TAP version 14",

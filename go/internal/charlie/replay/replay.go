@@ -23,7 +23,8 @@ import (
 // such event triggers a comment warning on tw; subsequent depth>0 events
 // are dropped silently to avoid noise.
 //
-// Pragmas and output blocks in the input are dropped in v1.
+// Output blocks in the input are dropped in v1. Pragmas are passed
+// through to the child Writer.
 //
 // Returns a Summary derived from the test points actually emitted (depth==0
 // only) and any read error encountered. EOF is not returned as an error.
@@ -63,8 +64,14 @@ func Replay(r io.Reader, tw *writer.Writer) (diagnostic.Summary, error) {
 		}
 
 		switch ev.Type {
-		case diagnostic.EventVersion, diagnostic.EventPlan, diagnostic.EventPragma, diagnostic.EventOutputHeader, diagnostic.EventOutputLine, diagnostic.EventUnknown:
+		case diagnostic.EventVersion, diagnostic.EventPlan, diagnostic.EventOutputHeader, diagnostic.EventOutputLine, diagnostic.EventUnknown:
 			flushBuffered()
+
+		case diagnostic.EventPragma:
+			flushBuffered()
+			if ev.Pragma != nil {
+				tw.Pragma(ev.Pragma.Key, ev.Pragma.Enabled)
+			}
 
 		case diagnostic.EventTestPoint:
 			flushBuffered()

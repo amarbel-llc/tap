@@ -7,6 +7,19 @@ title: "TAP-14 Amendment: TTY Build Last Line"
 
 # TAP-14 Amendment: TTY Build Last Line
 
+> **Status: Superseded** by
+> [TAP-14 Amendment: TTY Build Tail Viewport](tty-build-tail-viewport-amendment.md).
+>
+> This amendment introduced a producer-side pragma
+> (`+tty-build-last-line`) for a single trailing TTY status line. It
+> was never adopted by any producer or harness. The successor
+> amendment generalizes the problem space to harness-side rendering
+> of streamed Output Block bodies as an N-line viewport tail,
+> requiring no pragma and no producer changes. Content is preserved
+> below for external-link stability; new work SHOULD use the
+> successor amendment together with the
+> [Streamed Output amendment](streamed-output-amendment.md).
+
 ## Problem
 
 Build systems and test runners often display a continuously updated

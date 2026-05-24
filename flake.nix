@@ -168,6 +168,27 @@
             tap-dancer-rust
             tap-dancer-bash
             ;
+          # flake-input-go_mod producer half (RFC 0001 in
+          # amarbel-llc/nixpkgs). Publishes a filtered view of `self`
+          # containing only Go-relevant files so consumers (e.g. madder)
+          # don't re-hash bash/, rust/, docs, or treefmt config when
+          # those change. `extras` keeps the module manifests under
+          # `go/` because tap is polyglot — the default keep-set anchors
+          # `go.mod`/`go.sum`/`gomod2nix.toml` at the source root.
+          # Consumers wire this via `subPath = "go"`.
+          #
+          # `.outPath` coerces the `lib.cleanSourceWith` set into a
+          # path the flake schema accepts; once
+          # amarbel-llc/nixpkgs#38 lands, the wrapper can be dropped.
+          go-pkgs =
+            (pkgs.goSourceFilter {
+              src = self;
+              extras = [
+                "^go/go\\.mod$"
+                "^go/go\\.sum$"
+                "^go/gomod2nix\\.toml$"
+              ];
+            }).outPath;
         }
         // batsLib.batsLaneOutputs;
 

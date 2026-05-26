@@ -74,7 +74,7 @@ let
   trimWhitespace =
     s:
     let
-      m = builtins.match "[ \t\n\r]*(.*[^ \t\n\r]|)[ \t\n\r]*" s;
+      m = builtins.match "[ \t]*(.*[^ \t]|)[ \t]*" s;
     in
     if m == null then s else builtins.head m;
 

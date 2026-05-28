@@ -1,5 +1,5 @@
 // Package ndjson aggregates TAP-14 reader events into NDJSON records
-// conforming to docs/rfcs/0001-test-result-ndjson-schema.md.
+// conforming to the tap-ndjson(7) manpage (doc/tap-ndjson.7.scd).
 package ndjson
 
 import (

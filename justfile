@@ -23,6 +23,10 @@ build-rust:
 build-bash:
     nix build .#tap-dancer-bash
 
+# Compile the scdoc section-7 manpages (tap-ndjson(7), etc.)
+build-doc:
+    nix build .#tap-dancer-doc
+
 test: test-go test-rust test-bats
 
 test-go:

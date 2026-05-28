@@ -111,12 +111,33 @@
           '';
         };
 
+        # Section-7 manpages compiled from scdoc sources in ./doc. The
+        # tap-ndjson(7) page is the sole normative specification of the
+        # format-ndjson wire format (see doc/tap-ndjson.7.scd). Follows
+        # the eng-manpages(7) reference derivation.
+        tap-dancer-doc = pkgs.stdenvNoCC.mkDerivation {
+          pname = "tap-dancer-doc";
+          inherit version;
+          src = ./doc;
+          nativeBuildInputs = [ pkgs.scdoc ];
+          dontUnpack = true;
+          dontBuild = true;
+          installPhase = ''
+            mkdir -p $out/share/man/man7
+            for f in $src/*.7.scd; do
+              [ -e "$f" ] || continue
+              scdoc < "$f" > "$out/share/man/man7/$(basename "$f" .scd)"
+            done
+          '';
+        };
+
         tap-dancer = pkgs.symlinkJoin {
           name = "tap-dancer";
           paths = [
             tap-dancer-go
             tap-dancer-rust
             tap-dancer-bash
+            tap-dancer-doc
           ];
         };
 
@@ -172,6 +193,7 @@
             tap-dancer-go
             tap-dancer-rust
             tap-dancer-bash
+            tap-dancer-doc
             ;
           inherit (goModule) go-pkgs go-pkgs-test;
         }

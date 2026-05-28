@@ -4,8 +4,8 @@ package operation_writer
 
 import internal "github.com/amarbel-llc/tap/go/internal/charlie/operation_writer"
 
-type (
-	OperationWriter = internal.OperationWriter
-)
+// OperationWriter bridges operation.Writer to tap-dancer's Writer,
+// converting operation lifecycle events into TAP-14 test output.
+type OperationWriter = internal.OperationWriter
 
 var NewOperationWriter = internal.NewOperationWriter

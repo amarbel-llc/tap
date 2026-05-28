@@ -4,8 +4,8 @@ package reader
 
 import internal "github.com/amarbel-llc/tap/go/internal/bravo/reader"
 
-type (
-	Reader = internal.Reader
-)
+// Reader is a streaming TAP-14 parser and validator.
+type Reader = internal.Reader
 
+// NewReader creates a new TAP-14 reader from the given input.
 var NewReader = internal.NewReader

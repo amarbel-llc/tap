@@ -4,19 +4,38 @@ package diagnostic
 
 import internal "github.com/amarbel-llc/tap/go/internal/0/diagnostic"
 
-type (
-	BailOutResult      = internal.BailOutResult
-	Diagnostic         = internal.Diagnostic
-	Directive          = internal.Directive
-	Event              = internal.Event
-	EventType          = internal.EventType
-	OutputHeaderResult = internal.OutputHeaderResult
-	PlanResult         = internal.PlanResult
-	PragmaResult       = internal.PragmaResult
-	Severity           = internal.Severity
-	Summary            = internal.Summary
-	TestPointResult    = internal.TestPointResult
-)
+// BailOutResult holds parsed data from a bail out line.
+type BailOutResult = internal.BailOutResult
+
+// Diagnostic represents a single validation problem found in TAP input.
+type Diagnostic = internal.Diagnostic
+
+// Directive represents a TAP test point directive.
+type Directive = internal.Directive
+
+// Event represents a single parsed TAP element.
+type Event = internal.Event
+
+// EventType classifies a parsed TAP line.
+type EventType = internal.EventType
+
+// OutputHeaderResult holds parsed data from an Output Block header.
+type OutputHeaderResult = internal.OutputHeaderResult
+
+// PlanResult holds parsed data from a plan line.
+type PlanResult = internal.PlanResult
+
+// PragmaResult holds parsed data from a pragma line.
+type PragmaResult = internal.PragmaResult
+
+// Severity indicates the severity of a validation diagnostic.
+type Severity = internal.Severity
+
+// Summary provides aggregate results after parsing a TAP document.
+type Summary = internal.Summary
+
+// TestPointResult holds parsed data from a test point line.
+type TestPointResult = internal.TestPointResult
 
 const (
 	DirectiveNone       = internal.DirectiveNone

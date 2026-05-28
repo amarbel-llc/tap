@@ -4,4 +4,9 @@ package cargotest
 
 import internal "github.com/amarbel-llc/tap/go/internal/charlie/cargotest"
 
+// ConvertCargoTest reads cargo test pretty output from r and writes TAP-14 to w.
+// If verbose is true, passing tests include output diagnostics.
+// If skipEmpty is true, suites with no tests emit a SKIP directive instead of not ok.
+// If color is true, ok/not ok keywords are ANSI-colorized.
+// Returns an exit code: 0 for all pass, 1 for any failure.
 var ConvertCargoTest = internal.ConvertCargoTest

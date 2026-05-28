@@ -4,12 +4,16 @@ package writer
 
 import internal "github.com/amarbel-llc/tap/go/internal/bravo/writer"
 
+// OutputBlockWriter writes indented body lines inside an Output Block.
+// The "# Output:" header is emitted lazily on the first Line call, so a
+// block whose callback never writes a body line produces no header at all.
 type (
 	OutputBlockWriter = internal.OutputBlockWriter
 	TestPoint         = internal.TestPoint
 	Writer            = internal.Writer
 )
 
+// NewColorWriter creates a Writer that colorizes ok/not ok when color is true.
 var (
 	NewColorWriter  = internal.NewColorWriter
 	NewLocaleWriter = internal.NewLocaleWriter

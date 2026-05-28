@@ -4,11 +4,16 @@ package yaml_diagnostic
 
 import internal "github.com/amarbel-llc/tap/go/internal/alfa/yaml_diagnostic"
 
-type (
-	YAMLDiagnostic = internal.YAMLDiagnostic
-)
+// YAMLDiagnostic models the YAML Diagnostic block under a TAP-14 Test Point
+// (see TAP-14 spec §"YAML Diagnostics").
+type YAMLDiagnostic = internal.YAMLDiagnostic
 
-var (
-	SanitizeYAMLValue = internal.SanitizeYAMLValue
-	WriteDiagnostics  = internal.WriteDiagnostics
-)
+// SanitizeYAMLValue strips ANSI/CSI escape sequences from a YAML value, per
+// the TAP-14 ANSI Display Hints amendment. When color is true, SGR (color)
+// sequences are preserved and only non-SGR CSI is stripped.
+var SanitizeYAMLValue = internal.SanitizeYAMLValue
+
+// WriteDiagnostics serializes a YAMLDiagnostic as a TAP-14 YAML diagnostic
+// block (between "  ---" and "  ...") to w. A nil or empty diagnostic
+// produces no output.
+var WriteDiagnostics = internal.WriteDiagnostics

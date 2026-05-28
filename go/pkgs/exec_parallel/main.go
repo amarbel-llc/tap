@@ -4,16 +4,38 @@ package exec_parallel
 
 import internal "github.com/amarbel-llc/tap/go/internal/delta/exec_parallel"
 
-type (
-	ExecOption        = internal.ExecOption
-	ExecResult        = internal.ExecResult
-	Executor          = internal.Executor
-	GoroutineExecutor = internal.GoroutineExecutor
-)
+// ConvertExecParallelWithStatus runs commands via the executor and writes TAP-14
+// output with a tty-build-last-line status line.
+//
+// When maxJobs == 1 (sequential), the status line shows the last line of stdout
+// from the currently running command. When maxJobs != 1 (parallel), the status
+// ExecOption configures exec and exec-parallel behavior.
+type ExecOption = internal.ExecOption
 
+// ExecResult holds the outcome of a single parallel command execution.
+type ExecResult = internal.ExecResult
+
+// Executor runs a template command against a list of arguments in parallel
+// and streams results in argument order.
+type Executor = internal.Executor
+
+// GoroutineExecutor runs commands concurrently using goroutines.
+// MaxJobs limits concurrency; 0 means unlimited.
+type GoroutineExecutor = internal.GoroutineExecutor
+
+// ConvertExec runs commands sequentially with a tty-build-last-line status line
+// showing the last stdout line from the currently running command.
+// Each arg is run as: utility + " " + arg. If args is empty, utility is run once.
+// Returns 0 if all commands succeeded, 1 if any failed.
+var ConvertExec = internal.ConvertExec
+
+// ConvertExecParallel writes TAP-14 output from parallel execution results.
+// Returns 0 if all commands succeeded, 1 if any failed.
 var (
-	ConvertExec                   = internal.ConvertExec
 	ConvertExecParallel           = internal.ConvertExecParallel
 	ConvertExecParallelWithStatus = internal.ConvertExecParallelWithStatus
-	WithSpinner                   = internal.WithSpinner
 )
+
+// WithSpinner controls whether a spinner prefix is shown on status lines.
+// Default is true.
+var WithSpinner = internal.WithSpinner

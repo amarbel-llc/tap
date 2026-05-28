@@ -4,4 +4,19 @@ package replay
 
 import internal "github.com/amarbel-llc/tap/go/internal/charlie/replay"
 
+// Replay parses a TAP-14 stream from r and re-emits it onto tw, preserving
+// test points (with directives), comments, bail outs, and YAML diagnostics.
+// The stream's "TAP version 14" line is consumed but not re-emitted (the
+// caller's tw owns versioning). The plan line is also consumed and not
+// re-emitted; the caller should call tw.Plan() after Replay returns.
+//
+// Nested subtests in the input (Depth > 0) are not yet supported. The first
+// such event triggers a comment warning on tw; subsequent depth>0 events
+// are dropped silently to avoid noise.
+//
+// Output blocks in the input are dropped in v1. Pragmas are passed
+// through to the child Writer.
+//
+// Returns a Summary derived from the test points actually emitted (depth==0
+// only) and any read error encountered. EOF is not returned as an error.
 var Replay = internal.Replay

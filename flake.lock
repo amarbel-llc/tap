@@ -203,6 +203,44 @@
         "type": "github"
       }
     },
+    "purse-first": {
+      "inputs": {
+        "crane": [
+          "crane"
+        ],
+        "gomod2nix": [
+          "gomod2nix"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "nixpkgs-master": [
+          "nixpkgs-master"
+        ],
+        "rust-overlay": [
+          "rust-overlay"
+        ],
+        "treefmt-nix": [
+          "treefmt-nix"
+        ],
+        "utils": [
+          "utils"
+        ]
+      },
+      "locked": {
+        "lastModified": 1779962381,
+        "narHash": "sha256-E1odttVT2JJb+RLBCPoXSPvYE1mEwyOln69Bw4+vmq8=",
+        "owner": "amarbel-llc",
+        "repo": "purse-first",
+        "rev": "07a2a0a16dac7e6922806183d96b9b4ec9e90e63",
+        "type": "github"
+      },
+      "original": {
+        "owner": "amarbel-llc",
+        "repo": "purse-first",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "bats": "bats",
@@ -210,6 +248,7 @@
         "gomod2nix": "gomod2nix",
         "nixpkgs": "nixpkgs",
         "nixpkgs-master": "nixpkgs-master_3",
+        "purse-first": "purse-first",
         "rust-overlay": "rust-overlay",
         "treefmt-nix": "treefmt-nix_3",
         "utils": "utils"

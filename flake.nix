@@ -41,6 +41,20 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
     };
+
+    # Provides the `dagnabit` codegen tool used by the
+    # `//go:generate dagnabit export` directives that produce the
+    # go/pkgs/* re-export shims. Devshell-only; not a build dependency.
+    purse-first = {
+      url = "github:amarbel-llc/purse-first";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.utils.follows = "utils";
+      inputs.gomod2nix.follows = "gomod2nix";
+      inputs.crane.follows = "crane";
+      inputs.rust-overlay.follows = "rust-overlay";
+      inputs.treefmt-nix.follows = "treefmt-nix";
+    };
   };
 
   outputs =
@@ -54,6 +68,7 @@
       rust-overlay,
       bats,
       treefmt-nix,
+      purse-first,
     }:
     utils.lib.eachDefaultSystem (
       system:
@@ -227,6 +242,9 @@
 
             # Used by the `release` recipe.
             pkgs.gh
+
+            # Codegen tool for the `//go:generate dagnabit export` shims.
+            purse-first.packages.${system}.dagnabit
           ];
           BATS_LIB_PATH = bats-libs.batsLibPath;
           GOTOOLCHAIN = "local";

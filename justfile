@@ -27,6 +27,13 @@ build-bash:
 build-doc:
     nix build .#tap-dancer-doc
 
+# Regenerate the go/pkgs/* re-export facades from the internal packages
+# via dagnabit (driven by the //go:generate dagnabit export directives).
+# Must run from the go module root: `go generate` can't drive it because
+# it cd's into the package dir, which has no go.mod.
+build-facades:
+    {{cmd_nix_dev}} bash -c 'cd go && dagnabit export'
+
 test: test-go test-rust test-bats
 
 test-go:

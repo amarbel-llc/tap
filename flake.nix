@@ -73,12 +73,11 @@
     utils.lib.eachDefaultSystem (
       system:
       let
-        # Fork's overlay provides buildGoApplication and mkGoEnv (the
-        # gomod2nix-style Go builder, distinct from upstream buildGoModule).
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ nixpkgs.overlays.default ];
-        };
+        # The amarbel-llc/nixpkgs fork's default.nix shim auto-applies the
+        # fork overlay on import (eng#60), so buildGoApplication and mkGoEnv
+        # (the gomod2nix-style Go builder, distinct from upstream
+        # buildGoModule) are available without an explicit overlays entry.
+        pkgs = import nixpkgs { inherit system; };
         pkgs-master = import nixpkgs-master { inherit system; };
         pkgs-rust = import nixpkgs {
           inherit system;

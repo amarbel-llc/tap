@@ -48,6 +48,8 @@ contain unescaped line feeds within their JSON encoding.
 
 Records MUST appear in the following order:
 
+. Zero or one *plan* record. If present, it MUST be the first record,
+  before any *test* record.
 . Zero or more *test* records, in the order their correlated TAP test
   points appeared in the source stream.
 . At most one *bailout* record, if the source stream contained a
@@ -59,9 +61,39 @@ A document with zero *test* records MUST still emit a *summary* record.
 # RECORD TYPE DISCRIMINATION
 
 Every record MUST contain a *type* field whose value is one of the
-strings _"test"_, _"bailout"_, or _"summary"_. Consumers MUST use this
-field to discriminate record types. Producers MUST NOT emit records with
-any other *type* value.
+strings _"plan"_, _"test"_, _"bailout"_, or _"summary"_. Consumers MUST
+use this field to discriminate record types. Producers MUST NOT emit
+records with any other *type* value.
+
+# PLAN RECORD
+
+A *plan* record announces, up front, how many top-level test points the
+producer intends to emit. It mirrors a leading TAP _1..N_ plan line.
+
+*type* (string)
+	Constant _"plan"_.
+
+*count* (integer)
+	The number of top-level test points the producer intends to emit;
+	mirrors TAP's _1..N_.
+
+The *plan* record is OPTIONAL. A producer that knows its plan up front
+SHOULD emit it as the first record; a producer that only learns the plan
+after running — for example a transformer reading a stream whose plan
+line is trailing — MAY omit it and report the count in the summary's
+*plan_count* field instead.
+
+A document MUST contain at most one *plan* record. If present, it MUST be
+the first record, before any *test* record. When both a *plan* record and
+a *summary* record are present, *plan_count* MUST equal the plan record's
+*count*; this preserves the completeness check of comparing *total*
+against *plan_count*.
+
+## Example
+
+```
+{"type":"plan","count":2}
+```
 
 # TEST RECORD
 
@@ -330,10 +362,13 @@ schema, not only the reference *tap-dancer* implementation.
 
 Covered requirements include:
 
-- Document Format: record ordering (*test* precedes *bailout* precedes
-  *summary*).
+- Document Format: record ordering (*plan* precedes *test* precedes
+  *bailout* precedes *summary*).
 - Document Format: a trailing *summary* record is always present, even
   for empty input.
+- Plan Record: a leading TAP plan emits a first *plan* record whose
+  *count* equals the plan, and *summary.plan_count* matches it.
+- Plan Record: a trailing TAP plan emits no *plan* record.
 - Test Record: all required fields present.
 - Test Record: subtest nesting matches source structure.
 - Test Record: *directive* shape (null, or *kind* and *reason*).

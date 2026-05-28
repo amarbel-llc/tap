@@ -15,10 +15,11 @@ teardown() {
 function format_ndjson_emits_one_record_per_test { # @test
   local input=$'TAP version 14\n1..2\nok 1 - a\nnot ok 2 - b\n'
   run bash -c "printf '%s' '$input' | $tap_dancer format-ndjson"
-  # 2 test records + 1 summary = 3 lines
+  # leading plan + 2 test records + 1 summary = 4 lines
   local count=$(echo "$output" | wc -l)
-  [ "$count" -eq 3 ]
-  # Last line is summary
+  [ "$count" -eq 4 ]
+  # First line is the plan, last line is the summary
+  echo "$output" | head -1 | jq -e '.type == "plan"'
   echo "$output" | tail -1 | jq -e '.type == "summary"'
 }
 
@@ -38,15 +39,15 @@ function format_ndjson_split_routes_by_verdict { # @test
   printf 'TAP version 14\n1..2\nok 1 - a\nnot ok 2 - b\n' \
     | "$tap_dancer" format-ndjson --split --pass-out "$passfile" > "$failfile" || true
 
-  # Failure stream: 1 test (n=2) + summary
+  # Failure stream: plan + 1 test (n=2) + summary
   run jq -s 'length' "$failfile"
-  assert_output "2"
+  assert_output "3"
   run jq -r 'select(.type == "test") | .n' "$failfile"
   assert_output "2"
 
-  # Pass stream: 1 test (n=1) + summary
+  # Pass stream: plan + 1 test (n=1) + summary
   run jq -s 'length' "$passfile"
-  assert_output "2"
+  assert_output "3"
   run jq -r 'select(.type == "test") | .n' "$passfile"
   assert_output "1"
 }
@@ -69,10 +70,12 @@ function format_ndjson_split_routes_todo_to_passes { # @test
 
 function format_ndjson_split_without_pass_out_drops_passes { # @test
   run bash -c "printf 'TAP version 14\n1..2\nok 1 - a\nnot ok 2 - b\n' | $tap_dancer format-ndjson --split"
-  # Should contain only the failing record + summary
+  # plan + the failing record + summary (passes dropped without --pass-out)
   local count=$(echo "$output" | wc -l)
-  [ "$count" -eq 2 ]
-  echo "$output" | head -1 | jq -e '.type == "test" and .ok == false'
+  [ "$count" -eq 3 ]
+  # Plan leads the stream; the sole test record is the failure
+  echo "$output" | head -1 | jq -e '.type == "plan"'
+  test "$(echo "$output" | jq -r 'select(.type == "test") | .ok')" = "false"
 }
 
 function format_ndjson_pass_out_without_split_fails { # @test
@@ -142,4 +145,38 @@ function format_ndjson_produces_valid_ndjson_each_line { # @test
   while IFS= read -r line; do
     echo "$line" | jq -e '.type' > /dev/null || { echo "bad line: $line"; return 1; }
   done < "$out_file"
+}
+
+function format_ndjson_emits_leading_plan_record { # @test
+  # A leading TAP plan (before any test point) becomes a first plan record.
+  local input=$'TAP version 14\n1..2\nok 1 - a\nok 2 - b\n'
+  local out_file="$BATS_TEST_TMPDIR/out.ndjson"
+  printf '%s' "$input" | "$tap_dancer" format-ndjson > "$out_file"
+  # First record is the plan with count == 2
+  head -1 "$out_file" | jq -e '.type == "plan" and .count == 2'
+  # summary.plan_count matches the plan record's count
+  run jq -r 'select(.type == "summary") | .plan_count' "$out_file"
+  assert_output "2"
+}
+
+function format_ndjson_trailing_plan_emits_no_plan_record { # @test
+  # A trailing TAP plan is not an up-front announcement: no plan record,
+  # but plan_count is still reported in the summary.
+  local input=$'TAP version 14\nok 1 - a\nok 2 - b\n1..2\n'
+  local out_file="$BATS_TEST_TMPDIR/out.ndjson"
+  printf '%s' "$input" | "$tap_dancer" format-ndjson > "$out_file"
+  run jq -rs '[.[] | select(.type == "plan")] | length' "$out_file"
+  assert_output "0"
+  run jq -r 'select(.type == "summary") | .plan_count' "$out_file"
+  assert_output "2"
+}
+
+function format_ndjson_split_emits_plan_first_in_both_streams { # @test
+  local passfile="$BATS_TEST_TMPDIR/pass.ndjson"
+  local failfile="$BATS_TEST_TMPDIR/fail.ndjson"
+  printf 'TAP version 14\n1..2\nok 1 - a\nnot ok 2 - b\n' \
+    | "$tap_dancer" format-ndjson --split --pass-out "$passfile" > "$failfile" || true
+  # The plan record leads both streams.
+  head -1 "$failfile" | jq -e '.type == "plan" and .count == 2'
+  head -1 "$passfile" | jq -e '.type == "plan" and .count == 2'
 }

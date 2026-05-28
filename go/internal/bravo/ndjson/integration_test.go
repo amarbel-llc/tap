@@ -253,3 +253,29 @@ func TestIntegrationEmptyInput(t *testing.T) {
 		t.Errorf("summary not emitted")
 	}
 }
+
+func TestIntegrationLeadingPlanEmitsPlanRecord(t *testing.T) {
+	// Plan announced up front (before any test point).
+	out := runReader(t, "TAP version 14\n1..2\nok 1 - a\nok 2 - b\n")
+	if out.Plan == nil {
+		t.Fatal("expected a leading plan record")
+	}
+	if out.Plan.Type != "plan" || out.Plan.Count != 2 {
+		t.Errorf("plan = %+v, want {plan 2}", out.Plan)
+	}
+	if out.Summary.PlanCount != out.Plan.Count {
+		t.Errorf("summary.PlanCount = %d, want %d", out.Summary.PlanCount, out.Plan.Count)
+	}
+}
+
+func TestIntegrationTrailingPlanOmitsPlanRecord(t *testing.T) {
+	// Plan reported at the end (after the test points): not an up-front
+	// announcement, so no plan record — only summary.plan_count.
+	out := runReader(t, "TAP version 14\nok 1 - a\nok 2 - b\n1..2\n")
+	if out.Plan != nil {
+		t.Errorf("expected no plan record for a trailing plan, got %+v", out.Plan)
+	}
+	if out.Summary.PlanCount != 2 {
+		t.Errorf("summary.PlanCount = %d, want 2", out.Summary.PlanCount)
+	}
+}

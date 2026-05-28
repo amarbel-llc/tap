@@ -12,6 +12,14 @@ import (
 
 //go:generate dagnabit export
 
+// PlanRecord announces, up front, how many top-level test points the
+// producer intends to emit. It mirrors a leading TAP `1..N` plan line
+// and, when present, is the first record of the document.
+type PlanRecord struct {
+	Type  string `json:"type"`
+	Count int    `json:"count"`
+}
+
 // TestRecord is one top-level test point with its full context.
 // All fields are emitted unconditionally; nullable fields use
 // pointers/slices so they serialize as JSON null when absent.
@@ -74,8 +82,12 @@ type SummaryDiagnostic struct {
 type Aggregator struct {
 	records   []TestRecord
 	planCount int
-	bailed    bool
-	bailout   *BailoutRecord
+	// planLeading is set when a top-level plan line arrived before any
+	// top-level test point, i.e. the producer announced its plan up
+	// front. Only then is a leading `plan` record emitted.
+	planLeading bool
+	bailed      bool
+	bailout     *BailoutRecord
 	// Accumulating Output Block body for the next top-level test point.
 	pendingOutput *string
 	// Children buffered at their own depth, keyed by that depth. The
@@ -86,6 +98,7 @@ type Aggregator struct {
 
 // Output is the result of finalizing an aggregator.
 type Output struct {
+	Plan    *PlanRecord
 	Records []TestRecord
 	Bailout *BailoutRecord
 	Summary SummaryRecord
@@ -104,6 +117,7 @@ func (a *Aggregator) Consume(ev diagnostic.Event) {
 	case diagnostic.EventPlan:
 		if ev.Depth == 0 && ev.Plan != nil {
 			a.planCount = ev.Plan.Count
+			a.planLeading = len(a.records) == 0
 		}
 	case diagnostic.EventTestPoint:
 		if ev.TestPoint == nil {
@@ -221,7 +235,13 @@ func (a *Aggregator) Finalize(readerDiags []diagnostic.Diagnostic, readerSummary
 		}
 	}
 
+	var plan *PlanRecord
+	if a.planLeading {
+		plan = &PlanRecord{Type: "plan", Count: a.planCount}
+	}
+
 	return Output{
+		Plan:    plan,
 		Records: a.records,
 		Bailout: a.bailout,
 		Summary: summary,
@@ -251,6 +271,11 @@ func buildTestRecord(ev diagnostic.Event) TestRecord {
 func WriteAll(w io.Writer, out Output) error {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
+	if out.Plan != nil {
+		if err := enc.Encode(out.Plan); err != nil {
+			return err
+		}
+	}
 	for _, rec := range out.Records {
 		if err := enc.Encode(rec); err != nil {
 			return err
@@ -275,6 +300,19 @@ func WriteSplit(failOut, passOut io.Writer, out Output) error {
 	if passOut != nil {
 		passEnc = json.NewEncoder(passOut)
 		passEnc.SetEscapeHTML(false)
+	}
+
+	// The plan is a document-level record (like bailout and summary):
+	// emit it first to both streams when present.
+	if out.Plan != nil {
+		if err := failEnc.Encode(out.Plan); err != nil {
+			return err
+		}
+		if passEnc != nil {
+			if err := passEnc.Encode(out.Plan); err != nil {
+				return err
+			}
+		}
 	}
 
 	for _, rec := range out.Records {

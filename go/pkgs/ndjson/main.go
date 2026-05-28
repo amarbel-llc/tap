@@ -4,18 +4,50 @@ package ndjson
 
 import internal "github.com/amarbel-llc/tap/go/internal/bravo/ndjson"
 
-type (
-	Aggregator        = internal.Aggregator
-	Output            = internal.Output
-	TestRecord        = internal.TestRecord
-	SummaryRecord     = internal.SummaryRecord
-	BailoutRecord     = internal.BailoutRecord
-	DirectiveValue    = internal.DirectiveValue
-	SummaryDiagnostic = internal.SummaryDiagnostic
-)
+// Aggregator builds NDJSON records from reader events.
+//
+// Call Consume for each event in order. Call Finalize once after
+// the stream is exhausted (typically at io.EOF from the reader).
+//
+// Subtests nest to arbitrary depth. When a test point arrives at
+// depth N, any pending children at depth N+1 are embedded as that
+// record's Subtest array. Records at depth > 0 are themselves
+// buffered as pending children of their eventual parent at depth-1.
+type Aggregator = internal.Aggregator
 
-var (
-	NewAggregator = internal.NewAggregator
-	WriteAll      = internal.WriteAll
-	WriteSplit    = internal.WriteSplit
-)
+// BailoutRecord indicates the source stream emitted `Bail out!`.
+type BailoutRecord = internal.BailoutRecord
+
+// DirectiveValue is the parsed test point directive.
+type DirectiveValue = internal.DirectiveValue
+
+// Output is the result of finalizing an aggregator.
+type Output = internal.Output
+
+// PlanRecord announces, up front, how many top-level test points the
+// producer intends to emit. It mirrors a leading TAP `1..N` plan line
+// and, when present, is the first record of the document.
+type PlanRecord = internal.PlanRecord
+
+// SummaryDiagnostic is one entry in SummaryRecord.Diagnostics.
+type SummaryDiagnostic = internal.SummaryDiagnostic
+
+// SummaryRecord reports aggregate counts and validity.
+type SummaryRecord = internal.SummaryRecord
+
+// TestRecord is one top-level test point with its full context.
+// All fields are emitted unconditionally; nullable fields use
+// pointers/slices so they serialize as JSON null when absent.
+type TestRecord = internal.TestRecord
+
+// NewAggregator constructs an empty Aggregator ready to consume events.
+var NewAggregator = internal.NewAggregator
+
+// WriteAll emits every record + bailout (if any) + summary to w as
+// newline-delimited JSON.
+var WriteAll = internal.WriteAll
+
+// WriteSplit emits failures (and any bailout + summary) to failOut,
+// and passes (+ bailout + summary) to passOut. passOut may be nil to
+// discard passing records.
+var WriteSplit = internal.WriteSplit

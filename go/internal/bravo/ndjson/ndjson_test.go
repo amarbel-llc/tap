@@ -474,3 +474,144 @@ func TestWriteSplitNilPassOut(t *testing.T) {
 		t.Errorf("passing record leaked into failure stream: %s", failBuf.String())
 	}
 }
+
+func TestPlanRecordMarshalsRequiredFields(t *testing.T) {
+	rec := PlanRecord{Type: "plan", Count: 2}
+
+	data, err := json.Marshal(rec)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	for _, f := range []string{"type", "count"} {
+		if _, ok := got[f]; !ok {
+			t.Errorf("missing required field %q in %s", f, data)
+		}
+	}
+	if got["type"] != "plan" {
+		t.Errorf("type = %v, want %q", got["type"], "plan")
+	}
+}
+
+func TestAggregatorEmitsLeadingPlanRecord(t *testing.T) {
+	events := []diagnostic.Event{
+		{Type: diagnostic.EventVersion, Line: 1, Depth: 0},
+		{Type: diagnostic.EventPlan, Line: 2, Depth: 0, Plan: &diagnostic.PlanResult{Count: 2}},
+		{Type: diagnostic.EventTestPoint, Line: 3, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 1, OK: true}},
+		{Type: diagnostic.EventTestPoint, Line: 4, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 2, OK: true}},
+	}
+
+	agg := NewAggregator()
+	for _, ev := range events {
+		agg.Consume(ev)
+	}
+	out := agg.Finalize(nil, nil)
+
+	if out.Plan == nil {
+		t.Fatal("expected a leading plan record")
+	}
+	if out.Plan.Type != "plan" || out.Plan.Count != 2 {
+		t.Errorf("plan = %+v, want {plan 2}", out.Plan)
+	}
+	// summary.plan_count MUST equal the plan record's count.
+	if out.Summary.PlanCount != out.Plan.Count {
+		t.Errorf("summary.PlanCount = %d, want %d (must equal plan.Count)", out.Summary.PlanCount, out.Plan.Count)
+	}
+}
+
+func TestAggregatorOmitsPlanRecordForTrailingPlan(t *testing.T) {
+	// A plan line arriving AFTER the first test point is not an up-front
+	// announcement, so no plan record is emitted; plan_count still lands
+	// in the summary.
+	events := []diagnostic.Event{
+		{Type: diagnostic.EventVersion, Line: 1, Depth: 0},
+		{Type: diagnostic.EventTestPoint, Line: 2, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 1, OK: true}},
+		{Type: diagnostic.EventTestPoint, Line: 3, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 2, OK: true}},
+		{Type: diagnostic.EventPlan, Line: 4, Depth: 0, Plan: &diagnostic.PlanResult{Count: 2}},
+	}
+
+	agg := NewAggregator()
+	for _, ev := range events {
+		agg.Consume(ev)
+	}
+	out := agg.Finalize(nil, nil)
+
+	if out.Plan != nil {
+		t.Errorf("expected no plan record for a trailing plan, got %+v", out.Plan)
+	}
+	if out.Summary.PlanCount != 2 {
+		t.Errorf("summary.PlanCount = %d, want 2", out.Summary.PlanCount)
+	}
+}
+
+func TestAggregatorOmitsPlanRecordWhenNoPlanLine(t *testing.T) {
+	events := []diagnostic.Event{
+		{Type: diagnostic.EventVersion, Line: 1, Depth: 0},
+		{Type: diagnostic.EventTestPoint, Line: 2, Depth: 0, TestPoint: &diagnostic.TestPointResult{Number: 1, OK: true}},
+	}
+
+	agg := NewAggregator()
+	for _, ev := range events {
+		agg.Consume(ev)
+	}
+	out := agg.Finalize(nil, nil)
+
+	if out.Plan != nil {
+		t.Errorf("expected no plan record when no plan line present, got %+v", out.Plan)
+	}
+}
+
+func TestWriteAllEmitsPlanRecordFirst(t *testing.T) {
+	out := Output{
+		Plan:    &PlanRecord{Type: "plan", Count: 2},
+		Records: []TestRecord{{Type: "test", N: 1, OK: true, Line: 1}, {Type: "test", N: 2, OK: true, Line: 2}},
+		Summary: SummaryRecord{Type: "summary", Passed: 2, Total: 2, PlanCount: 2, Diagnostics: []SummaryDiagnostic{}},
+	}
+
+	var buf bytes.Buffer
+	if err := WriteAll(&buf, out); err != nil {
+		t.Fatalf("WriteAll: %v", err)
+	}
+
+	lines := bytes.Split(bytes.TrimSuffix(buf.Bytes(), []byte("\n")), []byte("\n"))
+	if len(lines) != 4 {
+		t.Fatalf("expected 4 lines (plan + 2 tests + summary), got %d: %s", len(lines), buf.String())
+	}
+
+	var first map[string]any
+	if err := json.Unmarshal(lines[0], &first); err != nil {
+		t.Fatalf("unmarshal first line: %v", err)
+	}
+	if first["type"] != "plan" {
+		t.Errorf("first record type = %v, want plan", first["type"])
+	}
+}
+
+func TestWriteSplitEmitsPlanRecordFirstInBothStreams(t *testing.T) {
+	out := Output{
+		Plan:    &PlanRecord{Type: "plan", Count: 2},
+		Records: []TestRecord{{Type: "test", N: 1, OK: true, Line: 1}, {Type: "test", N: 2, OK: false, Line: 2}},
+		Summary: SummaryRecord{Type: "summary", Passed: 1, Failed: 1, Total: 2, PlanCount: 2, Diagnostics: []SummaryDiagnostic{}},
+	}
+
+	var failBuf, passBuf bytes.Buffer
+	if err := WriteSplit(&failBuf, &passBuf, out); err != nil {
+		t.Fatalf("WriteSplit: %v", err)
+	}
+
+	for name, buf := range map[string]*bytes.Buffer{"fail": &failBuf, "pass": &passBuf} {
+		lines := bytes.Split(bytes.TrimSuffix(buf.Bytes(), []byte("\n")), []byte("\n"))
+		var first map[string]any
+		if err := json.Unmarshal(lines[0], &first); err != nil {
+			t.Fatalf("%s stream: unmarshal first line: %v", name, err)
+		}
+		if first["type"] != "plan" {
+			t.Errorf("%s stream first record type = %v, want plan", name, first["type"])
+		}
+	}
+}

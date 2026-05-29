@@ -4,7 +4,7 @@
   inputs = {
     # amarbel-llc fork of nixpkgs. The overlay (`overlays.default`) adds
     # gomod2nix's buildGoApplication / mkGoEnv on top of upstream.
-    nixpkgs.url = "github:amarbel-llc/nixpkgs";
+    nixpkgs.url = "github:amarbel-llc/igloo";
 
     # Master nixpkgs pinned for the devshell's Go tooling
     # (gofumpt/gopls/golangci-lint). Go itself comes from the fork's

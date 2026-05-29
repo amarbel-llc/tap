@@ -205,9 +205,6 @@
     },
     "purse-first": {
       "inputs": {
-        "crane": [
-          "crane"
-        ],
         "gomod2nix": [
           "gomod2nix"
         ],
@@ -217,9 +214,6 @@
         "nixpkgs-master": [
           "nixpkgs-master"
         ],
-        "rust-overlay": [
-          "rust-overlay"
-        ],
         "treefmt-nix": [
           "treefmt-nix"
         ],
@@ -228,11 +222,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1780050290,
-        "narHash": "sha256-exDHAoNilgiNZviomulm8CQ/RhwN2IpjfepZOUZKaqg=",
+        "lastModified": 1780053588,
+        "narHash": "sha256-D5A9GoQpNVzrGnUMk16YVU01aC/JufZEcYJwIRspubw=",
         "owner": "amarbel-llc",
         "repo": "purse-first",
-        "rev": "2988b758ea3e3ab748871f20587b0be01dfe018a",
+        "rev": "a7ed7515da23e74d5d4ce21333de5ef423bde369",
         "type": "github"
       },
       "original": {

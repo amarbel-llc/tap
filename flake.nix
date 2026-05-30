@@ -51,8 +51,6 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
       inputs.gomod2nix.follows = "gomod2nix";
-      inputs.crane.follows = "crane";
-      inputs.rust-overlay.follows = "rust-overlay";
       inputs.treefmt-nix.follows = "treefmt-nix";
     };
   };

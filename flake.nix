@@ -4,7 +4,7 @@
   inputs = {
     # amarbel-llc fork of nixpkgs. The overlay (`overlays.default`) adds
     # gomod2nix's buildGoApplication / mkGoEnv on top of upstream.
-    nixpkgs.url = "github:amarbel-llc/igloo";
+    igloo.url = "github:amarbel-llc/igloo";
 
     # Master nixpkgs pinned for the devshell's Go tooling
     # (gofumpt/gopls/golangci-lint). Go itself comes from the fork's
@@ -16,7 +16,7 @@
 
     # `nix fmt` entry point. Config lives in ./treefmt.nix.
     treefmt-nix.url = "github:numtide/treefmt-nix";
-    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+    treefmt-nix.inputs.nixpkgs.follows = "igloo";
 
     # gomod2nix (devshell tool — generates go/gomod2nix.toml).
     gomod2nix = {
@@ -27,7 +27,7 @@
     crane.url = "github:ipetkov/crane";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "igloo";
     };
 
     # bats helper libraries (bats-support, bats-assert, …) bundled as
@@ -37,7 +37,7 @@
     # `bats-libs` output does not consume it — no circular dependency.
     bats = {
       url = "github:amarbel-llc/bats";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
     };
@@ -47,7 +47,7 @@
     # go/pkgs/* re-export shims. Devshell-only; not a build dependency.
     purse-first = {
       url = "github:amarbel-llc/purse-first";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
       inputs.gomod2nix.follows = "gomod2nix";
@@ -60,7 +60,7 @@
   outputs =
     {
       self,
-      nixpkgs,
+      igloo,
       nixpkgs-master,
       utils,
       gomod2nix,
@@ -77,9 +77,9 @@
         # fork overlay on import (eng#60), so buildGoApplication and mkGoEnv
         # (the gomod2nix-style Go builder, distinct from upstream
         # buildGoModule) are available without an explicit overlays entry.
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import igloo { inherit system; };
         pkgs-master = import nixpkgs-master { inherit system; };
-        pkgs-rust = import nixpkgs {
+        pkgs-rust = import igloo {
           inherit system;
           overlays = [ (import rust-overlay) ];
         };

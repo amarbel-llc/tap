@@ -243,6 +243,27 @@ impl<'a> NdjsonWriter<'a> {
         // inventing record types; comments are display-only, dropped here.
         Ok(())
     }
+
+    /// Emit the mandatory trailing summary record. A direct producer has
+    /// no parse diagnostics by construction, so `valid` is always true
+    /// and `diagnostics` always empty.
+    pub fn finish(&mut self) -> io::Result<()> {
+        self.check_open()?;
+        self.finished = true;
+        let record = SummaryRecord {
+            type_: "summary",
+            passed: self.passed,
+            failed: self.failed,
+            skipped: self.skipped,
+            todo: self.todo,
+            total: self.passed + self.failed + self.skipped + self.todo,
+            plan_count: self.plan_count,
+            bailed: self.bailed,
+            valid: true,
+            diagnostics: Vec::new(),
+        };
+        self.write_record(&record)
+    }
 }
 
 #[cfg(test)]
@@ -382,5 +403,86 @@ mod tests {
             w.comment("a note").unwrap();
         });
         assert_eq!(out, "");
+    }
+
+    #[test]
+    fn summary_counts_directives_regardless_of_ok() {
+        let out = capture(|w| {
+            w.ok("p").unwrap();
+            w.not_ok("f").unwrap();
+            w.skip("s", "r").unwrap();
+            w.todo("t", "r").unwrap();
+            w.finish().unwrap();
+        });
+        let summary = out.lines().last().unwrap();
+        assert_eq!(
+            summary,
+            "{\"type\":\"summary\",\"passed\":1,\"failed\":1,\"skipped\":1,\"todo\":1,\"total\":4,\"plan_count\":0,\"bailed\":false,\"valid\":true,\"diagnostics\":[]}"
+        );
+    }
+
+    #[test]
+    fn summary_reflects_plan_and_bailout() {
+        let out = capture(|w| {
+            w.plan_ahead(10).unwrap();
+            w.ok("a").unwrap();
+            w.bail_out("gone").unwrap();
+            w.finish().unwrap();
+        });
+        let summary = out.lines().last().unwrap();
+        assert!(summary.contains("\"plan_count\":10"));
+        assert!(summary.contains("\"bailed\":true"));
+    }
+
+    #[test]
+    fn empty_document_still_has_summary() {
+        let out = capture(|w| {
+            w.finish().unwrap();
+        });
+        assert!(out.contains("\"type\":\"summary\""));
+        assert!(out.contains("\"total\":0"));
+    }
+
+    #[test]
+    fn double_finish_errors() {
+        let mut buf = Vec::new();
+        let mut w = NdjsonWriter::new(&mut buf);
+        w.finish().unwrap();
+        let err = w.finish().unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn record_after_finish_errors() {
+        let mut buf = Vec::new();
+        let mut w = NdjsonWriter::new(&mut buf);
+        w.finish().unwrap();
+        let err = w.ok("too late").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn document_record_ordering() {
+        let out = capture(|w| {
+            w.plan_ahead(1).unwrap();
+            w.ok("a").unwrap();
+            w.bail_out("gone").unwrap();
+            w.finish().unwrap();
+        });
+        let types: Vec<&str> = out
+            .lines()
+            .map(|l| {
+                if l.contains("\"type\":\"plan\"") {
+                    "plan"
+                } else if l.contains("\"type\":\"test\"") {
+                    "test"
+                } else if l.contains("\"type\":\"bailout\"") {
+                    "bailout"
+                } else {
+                    "summary"
+                }
+            })
+            .collect();
+        assert_eq!(types, ["plan", "test", "bailout", "summary"]);
     }
 }

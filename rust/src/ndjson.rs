@@ -90,6 +90,7 @@ pub struct NdjsonWriter<'a> {
     skipped: usize,
     todo: usize,
     plan_count: usize,
+    plan_emitted: bool,
     bailed: bool,
     finished: bool,
 }
@@ -104,6 +105,7 @@ impl<'a> NdjsonWriter<'a> {
             skipped: 0,
             todo: 0,
             plan_count: 0,
+            plan_emitted: false,
             bailed: false,
             finished: false,
         }
@@ -218,6 +220,10 @@ impl<'a> NdjsonWriter<'a> {
         if self.bailed {
             return Err(invalid_input("plan record after bailout"));
         }
+        if self.plan_emitted {
+            return Err(invalid_input("second plan record"));
+        }
+        self.plan_emitted = true;
         self.plan_count = n;
         self.write_record(&PlanRecord {
             type_: "plan",
@@ -371,6 +377,15 @@ mod tests {
         let mut buf = Vec::new();
         let mut w = NdjsonWriter::new(&mut buf);
         w.ok("a").unwrap();
+        let err = w.plan_ahead(2).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn second_plan_errors() {
+        let mut buf = Vec::new();
+        let mut w = NdjsonWriter::new(&mut buf);
+        w.plan_ahead(2).unwrap();
         let err = w.plan_ahead(2).unwrap_err();
         assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
     }

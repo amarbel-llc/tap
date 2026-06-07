@@ -68,6 +68,20 @@ fn invalid_input(msg: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, msg.to_string())
 }
 
+/// Empty slices map to `diagnostic: null`, mirroring TapWriter's
+/// not_ok_diag, which emits no YAML block for an empty slice.
+fn to_diag_map(diagnostics: &[(&str, Value)]) -> Option<Map<String, Value>> {
+    if diagnostics.is_empty() {
+        return None;
+    }
+    Some(
+        diagnostics
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect(),
+    )
+}
+
 pub struct NdjsonWriter<'a> {
     w: &'a mut dyn Write,
     counter: usize,
@@ -155,6 +169,46 @@ impl<'a> NdjsonWriter<'a> {
     pub fn not_ok(&mut self, description: &str) -> io::Result<usize> {
         self.test(description, false, None, None)
     }
+
+    pub fn ok_diag(
+        &mut self,
+        description: &str,
+        diagnostics: &[(&str, Value)],
+    ) -> io::Result<usize> {
+        self.test(description, true, None, to_diag_map(diagnostics))
+    }
+
+    pub fn not_ok_diag(
+        &mut self,
+        description: &str,
+        diagnostics: &[(&str, Value)],
+    ) -> io::Result<usize> {
+        self.test(description, false, None, to_diag_map(diagnostics))
+    }
+
+    pub fn skip(&mut self, description: &str, reason: &str) -> io::Result<usize> {
+        self.test(
+            description,
+            true,
+            Some(Directive {
+                kind: "skip",
+                reason: reason.to_string(),
+            }),
+            None,
+        )
+    }
+
+    pub fn todo(&mut self, description: &str, reason: &str) -> io::Result<usize> {
+        self.test(
+            description,
+            false,
+            Some(Directive {
+                kind: "todo",
+                reason: reason.to_string(),
+            }),
+            None,
+        )
+    }
 }
 
 #[cfg(test)]
@@ -198,5 +252,53 @@ mod tests {
         w.not_ok("b").unwrap();
         assert_eq!(w.count(), 2);
         assert!(w.has_failures());
+    }
+
+    #[test]
+    fn skip_directive_record() {
+        let out = capture(|w| {
+            w.skip("network test", "requires network").unwrap();
+        });
+        assert!(out.contains("\"directive\":{\"kind\":\"skip\",\"reason\":\"requires network\"}"));
+        assert!(out.contains("\"ok\":true"));
+    }
+
+    #[test]
+    fn todo_directive_record() {
+        let out = capture(|w| {
+            w.todo("future work", "not implemented").unwrap();
+        });
+        assert!(out.contains("\"directive\":{\"kind\":\"todo\",\"reason\":\"not implemented\"}"));
+        assert!(out.contains("\"ok\":false"));
+    }
+
+    #[test]
+    fn diagnostic_integers_stay_integers() {
+        let out = capture(|w| {
+            w.ok_diag("upstream answers", &[("keys", serde_json::json!(0))])
+                .unwrap();
+        });
+        assert!(out.contains("\"diagnostic\":{\"keys\":0}"));
+    }
+
+    #[test]
+    fn not_ok_diag_record() {
+        let out = capture(|w| {
+            w.not_ok_diag(
+                "socket answers",
+                &[("message", serde_json::json!("connection refused"))],
+            )
+            .unwrap();
+        });
+        assert!(out.contains("\"ok\":false"));
+        assert!(out.contains("\"diagnostic\":{\"message\":\"connection refused\"}"));
+    }
+
+    #[test]
+    fn empty_diag_slice_is_null() {
+        let out = capture(|w| {
+            w.not_ok_diag("broken", &[]).unwrap();
+        });
+        assert!(out.contains("\"diagnostic\":null"));
     }
 }

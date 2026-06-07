@@ -1,0 +1,9 @@
+# vim: ft=toml
+
+[hooks]
+# Override the eng-root hook (`just build-nix build-home-dry
+# validate-formatting`), whose recipe names belong to the eng root justfile
+# and don't exist here — with it inherited, no tap merge could ever pass.
+# tap's CI lane is the default recipe: `default: build test`
+# (= nix build + all impls' builds, then go/rust/bats suites).
+pre-merge = "just"

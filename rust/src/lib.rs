@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use fixed_decimal::Decimal;
 use icu_decimal::DecimalFormatter;
 use icu_locale_core::Locale;
+use serde_json::Value;
 
 #[derive(Clone)]
 pub struct TapConfig {
@@ -237,6 +238,36 @@ impl<'a> TapWriter<'a> {
             desc
         )?;
         write_diagnostics_block(self.w, diagnostics, self.config.color())?;
+        Ok(self.counter)
+    }
+
+    /// Test point with serde_json::Value diagnostics. Crate-internal:
+    /// the Reporter facade's TAP-side rendering of the shared
+    /// `&[(&str, Value)]` diagnostic shape.
+    pub(crate) fn test_point_diag_values(
+        &mut self,
+        ok: bool,
+        desc: &str,
+        diagnostics: &[(&str, Value)],
+    ) -> io::Result<usize> {
+        self.counter += 1;
+        if !ok {
+            self.failed = true;
+        }
+        let status = if ok {
+            status_ok(self.config.color())
+        } else {
+            status_not_ok(self.config.color())
+        };
+        let num = self.config.format_number(self.counter);
+        writeln!(self.w, "{} {} - {}", status, num, desc)?;
+        if !diagnostics.is_empty() {
+            writeln!(self.w, "  ---")?;
+            for (key, value) in diagnostics {
+                write_yaml_value_field(&mut *self.w, key, value, self.config.color())?;
+            }
+            writeln!(self.w, "  ...")?;
+        }
         Ok(self.counter)
     }
 
@@ -588,6 +619,21 @@ fn write_yaml_field(
         writeln!(w, "  {key}: \"{value}\"")?;
     }
     Ok(())
+}
+
+fn write_yaml_value_field(
+    w: &mut (impl Write + ?Sized),
+    key: &str,
+    value: &Value,
+    color: bool,
+) -> io::Result<()> {
+    match value {
+        // Strings go through the existing sanitizing/quoting path.
+        Value::String(s) => write_yaml_field(w, key, s, color),
+        // Numbers, bools, and null render bare (like `exitcode: 1`);
+        // arrays/objects render as compact JSON, valid YAML flow syntax.
+        other => writeln!(w, "  {key}: {other}"),
+    }
 }
 
 fn has_yaml_block(result: &TestResult) -> bool {
@@ -2464,5 +2510,45 @@ mod tests {
             got.contains("# Output: 2 - noisy"),
             "noisy block must emit a header, got:\n{got}"
         );
+    }
+
+    // --- Value-diagnostic rendering (used by the Reporter facade) ---
+
+    #[test]
+    fn diag_values_int_renders_bare() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.test_point_diag_values(true, "upstream answers", &[("keys", serde_json::json!(0))])
+            .unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("ok 1 - upstream answers\n"));
+        assert!(out.contains("  keys: 0\n"));
+        assert!(out.contains("  ---\n"));
+        assert!(out.contains("  ...\n"));
+    }
+
+    #[test]
+    fn diag_values_string_renders_quoted() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.test_point_diag_values(
+            false,
+            "broken",
+            &[("message", serde_json::json!("connection refused"))],
+        )
+        .unwrap();
+        assert!(tw.has_failures());
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("not ok 1 - broken\n"));
+        assert!(out.contains("  message: \"connection refused\"\n"));
+    }
+
+    #[test]
+    fn diag_values_empty_no_block() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.test_point_diag_values(true, "plain", &[]).unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(!out.contains("---"));
     }
 }

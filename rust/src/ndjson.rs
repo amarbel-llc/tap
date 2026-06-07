@@ -120,8 +120,14 @@ impl<'a> NdjsonWriter<'a> {
     }
 
     fn write_record<T: Serialize>(&mut self, record: &T) -> io::Result<()> {
-        serde_json::to_writer(&mut *self.w, record).map_err(io::Error::from)?;
-        self.w.write_all(b"\n")
+        // Encode the whole record (newline included) before touching the
+        // sink, then hand it over as one write_all: a sink failing
+        // mid-document can no longer tear a record across serde's many
+        // small writes, and records within PIPE_BUF are atomic on pipes
+        // (tap#38).
+        let mut line = serde_json::to_vec(record).map_err(io::Error::from)?;
+        line.push(b'\n');
+        self.w.write_all(&line)
     }
 
     fn check_open(&self) -> io::Result<()> {
@@ -297,6 +303,11 @@ impl<'a> NdjsonWriter<'a> {
     /// document best-effort instead — a bailout record (unless one was
     /// already emitted) followed by the summary, so the document stays
     /// spec-valid and is honestly marked incomplete via `bailed: true`.
+    ///
+    /// Not retryable: a failed summary write leaves the writer closed,
+    /// because retrying against a sink that failed mid-write risks a
+    /// torn-then-duplicated summary. Treat the document as abandoned and
+    /// start a fresh one (tap#38).
     pub fn finish(&mut self) -> io::Result<()> {
         self.check_open()?;
         self.finished = true;
@@ -638,6 +649,48 @@ mod tests {
         fn flush(&mut self) -> io::Result<()> {
             self.inner.flush()
         }
+    }
+
+    /// Accepts a limited number of write calls (each consuming its whole
+    /// buffer, mirroring single-syscall sinks), then fails. Counts calls,
+    /// not bytes — so it discriminates one-write_all-per-record emission
+    /// from serde's many-small-writes streaming.
+    struct CountingSink {
+        calls_left: usize,
+        inner: Vec<u8>,
+    }
+
+    impl Write for CountingSink {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            if self.calls_left == 0 {
+                return Err(io::Error::other("sink closed"));
+            }
+            self.calls_left -= 1;
+            self.inner.write(buf)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn record_emission_is_a_single_write() {
+        let mut sink = CountingSink {
+            calls_left: 1,
+            inner: Vec::new(),
+        };
+        {
+            let mut w = NdjsonWriter::new(&mut sink);
+            // The whole record (incl. newline) must reach the sink in the
+            // one write call it accepts; chunked emission would tear here.
+            w.ok("whole record in one write").unwrap();
+            // Drop's document-closing writes fail on the dead sink; fine.
+        }
+        let out = String::from_utf8(sink.inner).unwrap();
+        assert_eq!(out.lines().count(), 1);
+        assert!(out.ends_with("}\n"));
+        assert!(out.contains("\"description\":\"whole record in one write\""));
     }
 
     #[test]

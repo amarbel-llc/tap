@@ -310,17 +310,20 @@ impl<'a> NdjsonWriter<'a> {
 mod tests {
     use super::*;
 
-    fn capture(f: impl FnOnce(&mut NdjsonWriter)) -> String {
+    // Result-returning closure: a writer call without `?` (or an
+    // explicit unwrap) is a compile error, not a silently dropped error.
+    fn capture(f: impl FnOnce(&mut NdjsonWriter) -> io::Result<()>) -> String {
         let mut buf = Vec::new();
         let mut w = NdjsonWriter::new(&mut buf);
-        f(&mut w);
+        f(&mut w).unwrap();
         String::from_utf8(buf).unwrap()
     }
 
     #[test]
     fn ok_record() {
         let out = capture(|w| {
-            w.ok("socket answers").unwrap();
+            w.ok("socket answers")?;
+            Ok(())
         });
         assert_eq!(
             out,
@@ -331,7 +334,8 @@ mod tests {
     #[test]
     fn not_ok_record() {
         let out = capture(|w| {
-            w.not_ok("config parses").unwrap();
+            w.not_ok("config parses")?;
+            Ok(())
         });
         assert!(out.contains("\"ok\":false"));
         assert!(out.contains("\"n\":1"));
@@ -352,7 +356,8 @@ mod tests {
     #[test]
     fn skip_directive_record() {
         let out = capture(|w| {
-            w.skip("network test", "requires network").unwrap();
+            w.skip("network test", "requires network")?;
+            Ok(())
         });
         assert!(out.contains("\"directive\":{\"kind\":\"skip\",\"reason\":\"requires network\"}"));
         assert!(out.contains("\"ok\":true"));
@@ -361,7 +366,8 @@ mod tests {
     #[test]
     fn todo_directive_record() {
         let out = capture(|w| {
-            w.todo("future work", "not implemented").unwrap();
+            w.todo("future work", "not implemented")?;
+            Ok(())
         });
         assert!(out.contains("\"directive\":{\"kind\":\"todo\",\"reason\":\"not implemented\"}"));
         assert!(out.contains("\"ok\":false"));
@@ -374,8 +380,8 @@ mod tests {
                 "pcsc probe",
                 "no reader",
                 &[("readers", serde_json::json!(0))],
-            )
-            .unwrap();
+            )?;
+            Ok(())
         });
         assert!(out.contains("\"directive\":{\"kind\":\"skip\",\"reason\":\"no reader\"}"));
         assert!(out.contains("\"diagnostic\":{\"readers\":0}"));
@@ -389,8 +395,8 @@ mod tests {
                 "ipv6 upstreams",
                 "unimplemented",
                 &[("tracking", serde_json::json!("tap#37"))],
-            )
-            .unwrap();
+            )?;
+            Ok(())
         });
         assert!(out.contains("\"directive\":{\"kind\":\"todo\",\"reason\":\"unimplemented\"}"));
         assert!(out.contains("\"diagnostic\":{\"tracking\":\"tap#37\"}"));
@@ -400,10 +406,9 @@ mod tests {
     #[test]
     fn directive_diag_records_count_as_directives() {
         let out = capture(|w| {
-            w.skip_diag("s", "r", &[("k", serde_json::json!(1))])
-                .unwrap();
-            w.todo_diag("t", "r", &[]).unwrap();
-            w.finish().unwrap();
+            w.skip_diag("s", "r", &[("k", serde_json::json!(1))])?;
+            w.todo_diag("t", "r", &[])?;
+            w.finish()
         });
         let summary = out.lines().last().unwrap();
         assert!(summary.contains("\"skipped\":1"));
@@ -416,8 +421,8 @@ mod tests {
     #[test]
     fn diagnostic_integers_stay_integers() {
         let out = capture(|w| {
-            w.ok_diag("upstream answers", &[("keys", serde_json::json!(0))])
-                .unwrap();
+            w.ok_diag("upstream answers", &[("keys", serde_json::json!(0))])?;
+            Ok(())
         });
         assert!(out.contains("\"diagnostic\":{\"keys\":0}"));
     }
@@ -428,8 +433,8 @@ mod tests {
             w.not_ok_diag(
                 "socket answers",
                 &[("message", serde_json::json!("connection refused"))],
-            )
-            .unwrap();
+            )?;
+            Ok(())
         });
         assert!(out.contains("\"ok\":false"));
         assert!(out.contains("\"diagnostic\":{\"message\":\"connection refused\"}"));
@@ -438,7 +443,8 @@ mod tests {
     #[test]
     fn empty_diag_slice_is_null() {
         let out = capture(|w| {
-            w.not_ok_diag("broken", &[]).unwrap();
+            w.not_ok_diag("broken", &[])?;
+            Ok(())
         });
         assert!(out.contains("\"diagnostic\":null"));
     }
@@ -446,8 +452,9 @@ mod tests {
     #[test]
     fn plan_record_first() {
         let out = capture(|w| {
-            w.plan_ahead(2).unwrap();
-            w.ok("a").unwrap();
+            w.plan_ahead(2)?;
+            w.ok("a")?;
+            Ok(())
         });
         assert!(out.starts_with("{\"type\":\"plan\",\"count\":2}\n"));
     }
@@ -473,8 +480,8 @@ mod tests {
     #[test]
     fn bailout_record() {
         let out = capture(|w| {
-            w.ok("a").unwrap();
-            w.bail_out("database unreachable").unwrap();
+            w.ok("a")?;
+            w.bail_out("database unreachable")
         });
         assert!(
             out.contains(
@@ -494,20 +501,18 @@ mod tests {
 
     #[test]
     fn comment_is_silent() {
-        let out = capture(|w| {
-            w.comment("a note").unwrap();
-        });
+        let out = capture(|w| w.comment("a note"));
         assert_eq!(out, "");
     }
 
     #[test]
     fn summary_counts_directives_regardless_of_ok() {
         let out = capture(|w| {
-            w.ok("p").unwrap();
-            w.not_ok("f").unwrap();
-            w.skip("s", "r").unwrap();
-            w.todo("t", "r").unwrap();
-            w.finish().unwrap();
+            w.ok("p")?;
+            w.not_ok("f")?;
+            w.skip("s", "r")?;
+            w.todo("t", "r")?;
+            w.finish()
         });
         let summary = out.lines().last().unwrap();
         assert_eq!(
@@ -519,10 +524,10 @@ mod tests {
     #[test]
     fn summary_reflects_plan_and_bailout() {
         let out = capture(|w| {
-            w.plan_ahead(10).unwrap();
-            w.ok("a").unwrap();
-            w.bail_out("gone").unwrap();
-            w.finish().unwrap();
+            w.plan_ahead(10)?;
+            w.ok("a")?;
+            w.bail_out("gone")?;
+            w.finish()
         });
         let summary = out.lines().last().unwrap();
         assert!(summary.contains("\"plan_count\":10"));
@@ -531,9 +536,7 @@ mod tests {
 
     #[test]
     fn empty_document_still_has_summary() {
-        let out = capture(|w| {
-            w.finish().unwrap();
-        });
+        let out = capture(|w| w.finish());
         assert!(out.contains("\"type\":\"summary\""));
         assert!(out.contains("\"total\":0"));
     }
@@ -559,10 +562,10 @@ mod tests {
     #[test]
     fn document_record_ordering() {
         let out = capture(|w| {
-            w.plan_ahead(1).unwrap();
-            w.ok("a").unwrap();
-            w.bail_out("gone").unwrap();
-            w.finish().unwrap();
+            w.plan_ahead(1)?;
+            w.ok("a")?;
+            w.bail_out("gone")?;
+            w.finish()
         });
         let types: Vec<&str> = out
             .lines()

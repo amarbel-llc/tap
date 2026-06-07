@@ -226,6 +226,30 @@ mod tests {
     }
 
     #[test]
+    fn bail_out_dispatches_tap() {
+        let mut buf = Vec::new();
+        let mut r = Reporter::Tap(TapWriterBuilder::new(&mut buf).build().unwrap());
+        r.bail_out("gone").unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("Bail out! gone\n"));
+    }
+
+    // Explicit-variant construction (the `--format` forcing path) with
+    // TapWriterBuilder::new is env-independent: no color, no locale, so
+    // the directive token can be asserted byte-precisely — unlike the
+    // `auto` tty tests above, which must tolerate SGR wrapping.
+    #[test]
+    fn explicit_tap_variant_is_deterministic() {
+        let mut buf = Vec::new();
+        let mut r = Reporter::Tap(TapWriterBuilder::new(&mut buf).build().unwrap());
+        r.skip("optional", "not supported").unwrap();
+        r.finish().unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("ok 1 - optional # SKIP not supported\n"));
+        assert!(out.ends_with("1..1\n"));
+    }
+
+    #[test]
     fn directive_diags_dispatch_to_ndjson() {
         let mut buf = Vec::new();
         let mut r = Reporter::auto(&mut buf, false).unwrap();

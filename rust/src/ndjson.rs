@@ -270,12 +270,16 @@ impl<'a> NdjsonWriter<'a> {
         if self.bailed {
             return Err(invalid_input("second bailout record"));
         }
-        self.bailed = true;
+        // Flag only after the record is on the wire: a failed write must
+        // not leave the summary claiming bailed: true with no bailout
+        // record in the stream.
         self.write_record(&BailoutRecord {
             type_: "bailout",
             message: message.to_string(),
             line: 0,
-        })
+        })?;
+        self.bailed = true;
+        Ok(())
     }
 
     pub fn comment(&mut self, _text: &str) -> io::Result<()> {
@@ -614,6 +618,44 @@ mod tests {
             })
             .collect();
         assert_eq!(types, ["plan", "test", "bailout", "summary"]);
+    }
+
+    /// Fails every write until `failures_left` runs out, then delegates.
+    struct FlakyWriter {
+        failures_left: usize,
+        inner: Vec<u8>,
+    }
+
+    impl Write for FlakyWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            if self.failures_left > 0 {
+                self.failures_left -= 1;
+                return Err(io::Error::other("sink broken"));
+            }
+            self.inner.write(buf)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.inner.flush()
+        }
+    }
+
+    #[test]
+    fn failed_bailout_write_does_not_poison_state() {
+        let mut sink = FlakyWriter {
+            failures_left: 1,
+            inner: Vec::new(),
+        };
+        {
+            let mut w = NdjsonWriter::new(&mut sink);
+            w.bail_out("doomed").unwrap_err();
+            // The bailout record never reached the stream, so the
+            // summary must not claim bailed: true.
+            w.finish().unwrap();
+        }
+        let out = String::from_utf8(sink.inner).unwrap();
+        assert!(!out.contains("\"type\":\"bailout\""));
+        assert!(out.contains("\"bailed\":false"));
     }
 
     #[test]

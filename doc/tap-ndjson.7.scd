@@ -140,7 +140,9 @@ applicable.
 
 *line* (integer)
 	1-indexed line number in the source TAP stream where this test point
-	appeared.
+	appeared. Producers that emit records directly, without transforming
+	a source TAP stream, MUST emit 0, meaning no source line exists.
+	Consumers MUST treat a *line* of 0 as "no source position".
 
 Subtest records nested inside the *subtest* array MUST conform to the
 *test* record specification recursively. Nesting depth is bounded only by
@@ -186,7 +188,8 @@ _Bail out!_ directive. Every field below MUST be present.
 
 *line* (integer)
 	1-indexed line number of the _Bail out!_ directive in the source TAP
-	stream.
+	stream, or 0 when the producer has no source TAP stream (see the
+	*line* field of the test record).
 
 A document MUST contain at most one *bailout* record. If present, it MUST
 appear after all *test* records and before the *summary* record.

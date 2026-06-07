@@ -1,3 +1,6 @@
+mod ndjson;
+pub use ndjson::NdjsonWriter;
+
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 

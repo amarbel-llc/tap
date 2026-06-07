@@ -209,6 +209,40 @@ impl<'a> NdjsonWriter<'a> {
             None,
         )
     }
+
+    pub fn plan_ahead(&mut self, n: usize) -> io::Result<()> {
+        self.check_open()?;
+        if self.counter > 0 {
+            return Err(invalid_input("plan record after test records"));
+        }
+        if self.bailed {
+            return Err(invalid_input("plan record after bailout"));
+        }
+        self.plan_count = n;
+        self.write_record(&PlanRecord {
+            type_: "plan",
+            count: n,
+        })
+    }
+
+    pub fn bail_out(&mut self, message: &str) -> io::Result<()> {
+        self.check_open()?;
+        if self.bailed {
+            return Err(invalid_input("second bailout record"));
+        }
+        self.bailed = true;
+        self.write_record(&BailoutRecord {
+            type_: "bailout",
+            message: message.to_string(),
+            line: 0,
+        })
+    }
+
+    pub fn comment(&mut self, _text: &str) -> io::Result<()> {
+        // tap-ndjson(7) has no comment record and forbids producers
+        // inventing record types; comments are display-only, dropped here.
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -300,5 +334,53 @@ mod tests {
             w.not_ok_diag("broken", &[]).unwrap();
         });
         assert!(out.contains("\"diagnostic\":null"));
+    }
+
+    #[test]
+    fn plan_record_first() {
+        let out = capture(|w| {
+            w.plan_ahead(2).unwrap();
+            w.ok("a").unwrap();
+        });
+        assert!(out.starts_with("{\"type\":\"plan\",\"count\":2}\n"));
+    }
+
+    #[test]
+    fn plan_after_test_errors() {
+        let mut buf = Vec::new();
+        let mut w = NdjsonWriter::new(&mut buf);
+        w.ok("a").unwrap();
+        let err = w.plan_ahead(2).unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn bailout_record() {
+        let out = capture(|w| {
+            w.ok("a").unwrap();
+            w.bail_out("database unreachable").unwrap();
+        });
+        assert!(
+            out.contains(
+                "{\"type\":\"bailout\",\"message\":\"database unreachable\",\"line\":0}\n"
+            )
+        );
+    }
+
+    #[test]
+    fn test_after_bailout_errors() {
+        let mut buf = Vec::new();
+        let mut w = NdjsonWriter::new(&mut buf);
+        w.bail_out("gone").unwrap();
+        let err = w.ok("too late").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn comment_is_silent() {
+        let out = capture(|w| {
+            w.comment("a note").unwrap();
+        });
+        assert_eq!(out, "");
     }
 }

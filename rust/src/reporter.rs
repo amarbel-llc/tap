@@ -7,7 +7,7 @@ use std::io::{self, Write};
 use serde_json::Value;
 
 use crate::ndjson::NdjsonWriter;
-use crate::{TapWriter, TapWriterBuilder};
+use crate::{DiagDirective, TapWriter, TapWriterBuilder};
 
 pub enum Reporter<'a> {
     Tap(TapWriter<'a>),
@@ -67,6 +67,40 @@ impl<'a> Reporter<'a> {
         match self {
             Self::Tap(t) => t.test_point_diag_values(false, description, diagnostics),
             Self::Ndjson(j) => j.not_ok_diag(description, diagnostics),
+        }
+    }
+
+    pub fn skip_diag(
+        &mut self,
+        description: &str,
+        reason: &str,
+        diagnostics: &[(&str, Value)],
+    ) -> io::Result<usize> {
+        match self {
+            Self::Tap(t) => t.test_point_directive_diag_values(
+                DiagDirective::Skip,
+                description,
+                reason,
+                diagnostics,
+            ),
+            Self::Ndjson(j) => j.skip_diag(description, reason, diagnostics),
+        }
+    }
+
+    pub fn todo_diag(
+        &mut self,
+        description: &str,
+        reason: &str,
+        diagnostics: &[(&str, Value)],
+    ) -> io::Result<usize> {
+        match self {
+            Self::Tap(t) => t.test_point_directive_diag_values(
+                DiagDirective::Todo,
+                description,
+                reason,
+                diagnostics,
+            ),
+            Self::Ndjson(j) => j.todo_diag(description, reason, diagnostics),
         }
     }
 
@@ -189,5 +223,42 @@ mod tests {
         let out = String::from_utf8(buf).unwrap();
         assert!(out.contains("\"type\":\"bailout\""));
         assert!(out.contains("\"bailed\":true"));
+    }
+
+    #[test]
+    fn directive_diags_dispatch_to_ndjson() {
+        let mut buf = Vec::new();
+        let mut r = Reporter::auto(&mut buf, false).unwrap();
+        r.skip_diag("s", "no reader", &[("readers", serde_json::json!(0))])
+            .unwrap();
+        r.todo_diag(
+            "t",
+            "unimplemented",
+            &[("tracking", serde_json::json!("tap#37"))],
+        )
+        .unwrap();
+        r.finish().unwrap();
+        assert!(!r.has_failures());
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("\"kind\":\"skip\""));
+        assert!(out.contains("\"diagnostic\":{\"readers\":0}"));
+        assert!(out.contains("\"kind\":\"todo\""));
+    }
+
+    #[test]
+    fn directive_diags_dispatch_to_tap() {
+        let mut buf = Vec::new();
+        let mut r = Reporter::auto(&mut buf, true).unwrap();
+        r.skip_diag(
+            "optional",
+            "no reader",
+            &[("readers", serde_json::json!(0))],
+        )
+        .unwrap();
+        r.finish().unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        // Bare "SKIP": auto color may wrap the directive word in SGR codes.
+        assert!(out.contains("SKIP"));
+        assert!(out.contains("  readers: 0\n"));
     }
 }

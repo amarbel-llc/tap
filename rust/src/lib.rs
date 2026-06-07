@@ -173,6 +173,14 @@ fn token_bail_out(color: bool) -> &'static str {
     }
 }
 
+/// Directive kind for [`TapWriter::test_point_directive_diag_values`]:
+/// selects the status token (skip points pass, todo points are
+/// expected-to-fail) and the directive word.
+pub(crate) enum DiagDirective {
+    Skip,
+    Todo,
+}
+
 pub struct TestResult {
     pub number: usize,
     pub name: String,
@@ -263,14 +271,47 @@ impl<'a> TapWriter<'a> {
         };
         let num = self.config.format_number(self.counter);
         writeln!(self.w, "{} {} - {}", status, num, desc)?;
-        if !diagnostics.is_empty() {
-            writeln!(self.w, "  ---")?;
-            for (key, value) in diagnostics {
-                write_yaml_value_field(&mut *self.w, key, value, self.config.color())?;
-            }
-            writeln!(self.w, "  ...")?;
-        }
+        self.write_value_diag_block(diagnostics)?;
         Ok(self.counter)
+    }
+
+    /// Directive test point (`# SKIP`/`# TODO`) with serde_json::Value
+    /// diagnostics. Crate-internal: the Reporter facade's TAP-side
+    /// rendering for skip_diag/todo_diag. Mirrors `skip`/`todo`: the
+    /// directive kind fixes the status token, and neither kind sets the
+    /// failure flag.
+    pub(crate) fn test_point_directive_diag_values(
+        &mut self,
+        directive: DiagDirective,
+        desc: &str,
+        reason: &str,
+        diagnostics: &[(&str, Value)],
+    ) -> io::Result<usize> {
+        self.counter += 1;
+        let num = self.config.format_number(self.counter);
+        let color = self.config.color();
+        let (status, token) = match directive {
+            DiagDirective::Skip => (status_ok(color), directive_skip(color)),
+            DiagDirective::Todo => (status_not_ok(color), directive_todo(color)),
+        };
+        writeln!(
+            self.w,
+            "{} {} - {} # {} {}",
+            status, num, desc, token, reason
+        )?;
+        self.write_value_diag_block(diagnostics)?;
+        Ok(self.counter)
+    }
+
+    fn write_value_diag_block(&mut self, diagnostics: &[(&str, Value)]) -> io::Result<()> {
+        if diagnostics.is_empty() {
+            return Ok(());
+        }
+        writeln!(self.w, "  ---")?;
+        for (key, value) in diagnostics {
+            write_yaml_value_field(&mut *self.w, key, value, self.config.color())?;
+        }
+        writeln!(self.w, "  ...")
     }
 
     pub fn skip(&mut self, desc: &str, reason: &str) -> io::Result<usize> {
@@ -2550,6 +2591,53 @@ mod tests {
         let mut buf = Vec::new();
         let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
         tw.test_point_diag_values(true, "plain", &[]).unwrap();
+        let out = String::from_utf8(buf).unwrap();
+        assert!(!out.contains("---"));
+    }
+
+    #[test]
+    fn directive_diag_values_skip() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.test_point_directive_diag_values(
+            DiagDirective::Skip,
+            "pcsc probe",
+            "no reader",
+            &[("readers", serde_json::json!(0))],
+        )
+        .unwrap();
+        assert!(!tw.has_failures());
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("ok 1 - pcsc probe # SKIP no reader\n"));
+        assert!(out.contains("  readers: 0\n"));
+        assert!(out.contains("  ---\n"));
+        assert!(out.contains("  ...\n"));
+    }
+
+    #[test]
+    fn directive_diag_values_todo() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.test_point_directive_diag_values(
+            DiagDirective::Todo,
+            "ipv6 upstreams",
+            "unimplemented",
+            &[("tracking", serde_json::json!("tap#37"))],
+        )
+        .unwrap();
+        // Mirrors `todo`: a TODO point is expected-to-fail, not a failure.
+        assert!(!tw.has_failures());
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("not ok 1 - ipv6 upstreams # TODO unimplemented\n"));
+        assert!(out.contains("  tracking: \"tap#37\"\n"));
+    }
+
+    #[test]
+    fn directive_diag_values_empty_no_block() {
+        let mut buf = Vec::new();
+        let mut tw = TapWriterBuilder::new(&mut buf).build().unwrap();
+        tw.test_point_directive_diag_values(DiagDirective::Skip, "plain", "reason", &[])
+            .unwrap();
         let out = String::from_utf8(buf).unwrap();
         assert!(!out.contains("---"));
     }

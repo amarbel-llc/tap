@@ -188,6 +188,40 @@ impl<'a> NdjsonWriter<'a> {
         self.test(description, false, None, to_diag_map(diagnostics))
     }
 
+    pub fn skip_diag(
+        &mut self,
+        description: &str,
+        reason: &str,
+        diagnostics: &[(&str, Value)],
+    ) -> io::Result<usize> {
+        self.test(
+            description,
+            true,
+            Some(Directive {
+                kind: "skip",
+                reason: reason.to_string(),
+            }),
+            to_diag_map(diagnostics),
+        )
+    }
+
+    pub fn todo_diag(
+        &mut self,
+        description: &str,
+        reason: &str,
+        diagnostics: &[(&str, Value)],
+    ) -> io::Result<usize> {
+        self.test(
+            description,
+            false,
+            Some(Directive {
+                kind: "todo",
+                reason: reason.to_string(),
+            }),
+            to_diag_map(diagnostics),
+        )
+    }
+
     pub fn skip(&mut self, description: &str, reason: &str) -> io::Result<usize> {
         self.test(
             description,
@@ -331,6 +365,52 @@ mod tests {
         });
         assert!(out.contains("\"directive\":{\"kind\":\"todo\",\"reason\":\"not implemented\"}"));
         assert!(out.contains("\"ok\":false"));
+    }
+
+    #[test]
+    fn skip_diag_record() {
+        let out = capture(|w| {
+            w.skip_diag(
+                "pcsc probe",
+                "no reader",
+                &[("readers", serde_json::json!(0))],
+            )
+            .unwrap();
+        });
+        assert!(out.contains("\"directive\":{\"kind\":\"skip\",\"reason\":\"no reader\"}"));
+        assert!(out.contains("\"diagnostic\":{\"readers\":0}"));
+        assert!(out.contains("\"ok\":true"));
+    }
+
+    #[test]
+    fn todo_diag_record() {
+        let out = capture(|w| {
+            w.todo_diag(
+                "ipv6 upstreams",
+                "unimplemented",
+                &[("tracking", serde_json::json!("tap#37"))],
+            )
+            .unwrap();
+        });
+        assert!(out.contains("\"directive\":{\"kind\":\"todo\",\"reason\":\"unimplemented\"}"));
+        assert!(out.contains("\"diagnostic\":{\"tracking\":\"tap#37\"}"));
+        assert!(out.contains("\"ok\":false"));
+    }
+
+    #[test]
+    fn directive_diag_records_count_as_directives() {
+        let out = capture(|w| {
+            w.skip_diag("s", "r", &[("k", serde_json::json!(1))])
+                .unwrap();
+            w.todo_diag("t", "r", &[]).unwrap();
+            w.finish().unwrap();
+        });
+        let summary = out.lines().last().unwrap();
+        assert!(summary.contains("\"skipped\":1"));
+        assert!(summary.contains("\"todo\":1"));
+        assert!(summary.contains("\"failed\":0"));
+        // Empty diag slice on a directive point still maps to null.
+        assert!(out.contains("\"diagnostic\":null"));
     }
 
     #[test]

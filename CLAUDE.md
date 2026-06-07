@@ -9,7 +9,10 @@ reference implementation (`bash/`, `go/`, `rust/`, `skills/tap14/`).
 TAP-14 writer library (Go + Rust) and Claude skill plugin. The Go and Rust
 implementations verify the same TAP-14 spec compliance: version line, plan,
 test points (ok/not ok), YAML diagnostics, directives (SKIP/TODO), bail out,
-comments.
+comments. The Rust crate also ships a tap-ndjson(7) direct producer
+(`NdjsonWriter`) and a `Reporter` facade (tty→TAP text, non-tty→ndjson)
+consumed by downstream health commands; the Go CLI's `format-ndjson`
+transforms TAP text into the same wire format.
 
 ## Build & Test
 

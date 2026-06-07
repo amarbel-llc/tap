@@ -179,6 +179,7 @@ mod tests {
         run_checks(&mut r);
         assert!(r.has_failures());
         assert_eq!(r.count(), 4);
+        drop(r);
         let out = String::from_utf8(buf).unwrap();
         assert!(out.starts_with("TAP version 14\n"));
         assert!(out.contains("1..4\n"));
@@ -196,6 +197,7 @@ mod tests {
         run_checks(&mut r);
         assert!(r.has_failures());
         assert_eq!(r.count(), 4);
+        drop(r);
         let out = String::from_utf8(buf).unwrap();
         assert!(out.starts_with("{\"type\":\"plan\",\"count\":4}\n"));
         assert!(out.contains("\"diagnostic\":{\"keys\":0}"));
@@ -210,6 +212,7 @@ mod tests {
         let mut r = Reporter::auto(&mut buf, true).unwrap();
         r.ok("only").unwrap();
         r.finish().unwrap();
+        drop(r);
         let out = String::from_utf8(buf).unwrap();
         assert!(out.ends_with("1..1\n"));
     }
@@ -220,6 +223,7 @@ mod tests {
         let mut r = Reporter::auto(&mut buf, false).unwrap();
         r.bail_out("gone").unwrap();
         r.finish().unwrap();
+        drop(r);
         let out = String::from_utf8(buf).unwrap();
         assert!(out.contains("\"type\":\"bailout\""));
         assert!(out.contains("\"bailed\":true"));
@@ -230,6 +234,7 @@ mod tests {
         let mut buf = Vec::new();
         let mut r = Reporter::Tap(TapWriterBuilder::new(&mut buf).build().unwrap());
         r.bail_out("gone").unwrap();
+        drop(r);
         let out = String::from_utf8(buf).unwrap();
         assert!(out.contains("Bail out! gone\n"));
     }
@@ -244,6 +249,7 @@ mod tests {
         let mut r = Reporter::Tap(TapWriterBuilder::new(&mut buf).build().unwrap());
         r.skip("optional", "not supported").unwrap();
         r.finish().unwrap();
+        drop(r);
         let out = String::from_utf8(buf).unwrap();
         assert!(out.contains("ok 1 - optional # SKIP not supported\n"));
         assert!(out.ends_with("1..1\n"));
@@ -263,6 +269,7 @@ mod tests {
         .unwrap();
         r.finish().unwrap();
         assert!(!r.has_failures());
+        drop(r);
         let out = String::from_utf8(buf).unwrap();
         assert!(out.contains("\"kind\":\"skip\""));
         assert!(out.contains("\"diagnostic\":{\"readers\":0}"));
@@ -280,6 +287,7 @@ mod tests {
         )
         .unwrap();
         r.finish().unwrap();
+        drop(r);
         let out = String::from_utf8(buf).unwrap();
         // Bare "SKIP": auto color may wrap the directive word in SGR codes.
         assert!(out.contains("SKIP"));

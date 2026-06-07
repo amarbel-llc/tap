@@ -287,6 +287,12 @@ impl<'a> NdjsonWriter<'a> {
     /// Emit the mandatory trailing summary record. A direct producer has
     /// no parse diagnostics by construction, so `valid` is always true
     /// and `diagnostics` always empty.
+    ///
+    /// Call this on every normal exit path. If the writer is dropped
+    /// without it (early `?` return, panic), [`Drop`] closes the
+    /// document best-effort instead — a bailout record (unless one was
+    /// already emitted) followed by the summary, so the document stays
+    /// spec-valid and is honestly marked incomplete via `bailed: true`.
     pub fn finish(&mut self) -> io::Result<()> {
         self.check_open()?;
         self.finished = true;
@@ -306,16 +312,38 @@ impl<'a> NdjsonWriter<'a> {
     }
 }
 
+/// A document MUST end with exactly one summary record (tap-ndjson(7)),
+/// but a `?`-bubbled error or panic in the caller would otherwise drop
+/// the writer summary-less. Closing best-effort here keeps the document
+/// spec-valid and marks it incomplete the way the spec already provides
+/// for: `bailed: true`. Write errors are ignored — Drop cannot
+/// propagate them, and the document was abandoned anyway.
+impl Drop for NdjsonWriter<'_> {
+    fn drop(&mut self) {
+        if self.finished {
+            return;
+        }
+        if !self.bailed {
+            let _ = self.bail_out("NdjsonWriter dropped without finish()");
+        }
+        let _ = self.finish();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     // Result-returning closure: a writer call without `?` (or an
     // explicit unwrap) is a compile error, not a silently dropped error.
+    // The writer is scoped so its Drop (which may close the document)
+    // releases the buffer borrow before the buffer is consumed.
     fn capture(f: impl FnOnce(&mut NdjsonWriter) -> io::Result<()>) -> String {
         let mut buf = Vec::new();
-        let mut w = NdjsonWriter::new(&mut buf);
-        f(&mut w).unwrap();
+        {
+            let mut w = NdjsonWriter::new(&mut buf);
+            f(&mut w).unwrap();
+        }
         String::from_utf8(buf).unwrap()
     }
 
@@ -325,9 +353,10 @@ mod tests {
             w.ok("socket answers")?;
             Ok(())
         });
+        // First line only: Drop closes the unfinished document behind it.
         assert_eq!(
-            out,
-            "{\"type\":\"test\",\"n\":1,\"description\":\"socket answers\",\"ok\":true,\"directive\":null,\"diagnostic\":null,\"output\":null,\"subtest\":null,\"line\":0}\n"
+            out.lines().next().unwrap(),
+            "{\"type\":\"test\",\"n\":1,\"description\":\"socket answers\",\"ok\":true,\"directive\":null,\"diagnostic\":null,\"output\":null,\"subtest\":null,\"line\":0}"
         );
     }
 
@@ -501,8 +530,11 @@ mod tests {
 
     #[test]
     fn comment_is_silent() {
+        // Both captures end with the same Drop-emitted document closure;
+        // equality proves comment() itself wrote nothing.
+        let baseline = capture(|_| Ok(()));
         let out = capture(|w| w.comment("a note"));
-        assert_eq!(out, "");
+        assert_eq!(out, baseline);
     }
 
     #[test]
@@ -582,5 +614,50 @@ mod tests {
             })
             .collect();
         assert_eq!(types, ["plan", "test", "bailout", "summary"]);
+    }
+
+    #[test]
+    fn drop_unfinished_closes_document() {
+        let mut buf = Vec::new();
+        {
+            let mut w = NdjsonWriter::new(&mut buf);
+            w.ok("a").unwrap();
+        }
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.contains("\"type\":\"bailout\""));
+        assert!(out.contains("dropped without finish"));
+        let last = out.lines().last().unwrap();
+        assert!(last.contains("\"type\":\"summary\""));
+        assert!(last.contains("\"bailed\":true"));
+    }
+
+    #[test]
+    fn drop_after_finish_emits_nothing_extra() {
+        let mut buf = Vec::new();
+        {
+            let mut w = NdjsonWriter::new(&mut buf);
+            w.ok("a").unwrap();
+            w.finish().unwrap();
+        }
+        let out = String::from_utf8(buf).unwrap();
+        assert_eq!(out.matches("\"type\":\"summary\"").count(), 1);
+        assert!(!out.contains("\"type\":\"bailout\""));
+    }
+
+    #[test]
+    fn drop_after_explicit_bailout_adds_only_summary() {
+        let mut buf = Vec::new();
+        {
+            let mut w = NdjsonWriter::new(&mut buf);
+            w.ok("a").unwrap();
+            w.bail_out("card gone").unwrap();
+        }
+        let out = String::from_utf8(buf).unwrap();
+        // The caller's bailout stands; Drop adds only the summary.
+        assert_eq!(out.matches("\"type\":\"bailout\"").count(), 1);
+        assert!(out.contains("card gone"));
+        let last = out.lines().last().unwrap();
+        assert!(last.contains("\"type\":\"summary\""));
+        assert!(last.contains("\"bailed\":true"));
     }
 }

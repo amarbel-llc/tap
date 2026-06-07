@@ -1,5 +1,7 @@
 mod ndjson;
 pub use ndjson::NdjsonWriter;
+mod reporter;
+pub use reporter::Reporter;
 
 use std::io::{self, Write};
 use std::time::{Duration, Instant};

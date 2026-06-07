@@ -397,6 +397,12 @@ according to the following rules:
 Incompatible changes MUST be specified in a new revision that supersedes
 this page.
 
+This schema is also consumed beyond this repository: the ndjson-crap
+format (the canonical CRAP-2 wire format, amarbel-llc/crap) incorporates
+it as a source dialect of its superset schema. Revisions here propagate
+into that ecosystem; editors weighing a change MUST consider those
+consumers in addition to this repository's own.
+
 # SEE ALSO
 
 The TAP-14 specification and its amendments, distributed with this
@@ -406,6 +412,10 @@ repository:
 - _streamed-output-amendment.md_ - Output Block structure.
 - _ansi-yaml-output-amendment.md_ - ANSI in YAML Output Blocks.
 - _ansi-display-amendment.md_ - ANSI display hints.
+
+Downstream supersets: _ndjson-crap_ (amarbel-llc/crap,
+_docs/ndjson-crap-schema.md_ there) unifies this schema with just-us's
+execution-event stream under one canonical format.
 
 Normative external references: RFC 2119 (requirement-level key words) and
 RFC 8259 (the JSON data interchange format).

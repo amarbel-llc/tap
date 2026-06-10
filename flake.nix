@@ -51,7 +51,6 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
       inputs.gomod2nix.follows = "gomod2nix";
-      inputs.treefmt-nix.follows = "treefmt-nix";
     };
   };
 

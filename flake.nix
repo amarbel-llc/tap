@@ -52,6 +52,12 @@
       inputs.utils.follows = "utils";
       inputs.gomod2nix.follows = "gomod2nix";
     };
+    utils.inputs.systems.follows = "igloo/systems";
+    gomod2nix.inputs.nixpkgs-master.follows = "nixpkgs-master";
+    igloo.inputs.nixpkgs-master.follows = "nixpkgs-master";
+    bats.inputs.treefmt-nix.follows = "treefmt-nix";
+    igloo.inputs.treefmt-nix.follows = "treefmt-nix";
+    gomod2nix.inputs.flake-utils.follows = "utils";
   };
 
   outputs =

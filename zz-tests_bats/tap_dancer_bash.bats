@@ -4,7 +4,7 @@ setup() {
   load "$(dirname "$BATS_TEST_FILE")/common.bash"
   setup_test_home
   require_bin TAP_DANCER_LIB tap-dancer-load.bash 2>/dev/null || {
-    if [[ -z "${TAP_DANCER_LIB:-}" ]]; then
+    if [[ -z ${TAP_DANCER_LIB:-} ]]; then
       echo "TAP_DANCER_LIB unset (path to dir containing load.bash)" >&2
       return 1
     fi

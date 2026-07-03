@@ -26,20 +26,20 @@ function make_go_fixture {
   local outcome="$2"
   local dir="$BATS_TEST_TMPDIR/$name"
   mkdir -p "$dir"
-  cat > "$dir/go.mod" <<EOF
+  cat >"$dir/go.mod" <<EOF
 module example
 go 1.26
 EOF
   case "$outcome" in
     pass)
-      cat > "$dir/x_test.go" <<'EOF'
+      cat >"$dir/x_test.go" <<'EOF'
 package example
 import "testing"
 func TestOK(t *testing.T) {}
 EOF
       ;;
     fail)
-      cat > "$dir/x_test.go" <<'EOF'
+      cat >"$dir/x_test.go" <<'EOF'
 package example
 import "testing"
 func TestFail(t *testing.T) { t.Fatal("boom") }
@@ -76,7 +76,7 @@ function go_test_format_ndjson_split_routes_failures { # @test
   dir=$(make_go_fixture fail-fixture fail)
   local passfile="$BATS_TEST_TMPDIR/passes.ndjson"
   local failfile="$BATS_TEST_TMPDIR/fails.ndjson"
-  bash -c "cd '$dir' && '$tap_dancer' go-test --format=ndjson --split --pass-out '$passfile' ./..." > "$failfile" || true
+  bash -c "cd '$dir' && '$tap_dancer' go-test --format=ndjson --split --pass-out '$passfile' ./..." >"$failfile" || true
   # The failure file must contain at least one failing test record.
   run jq -r 'select(.type == "test" and .ok == false) | .description' "$failfile"
   [ -n "$output" ]

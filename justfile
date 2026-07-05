@@ -31,8 +31,16 @@ build-doc:
 # via dagnabit (driven by the //go:generate dagnabit export directives).
 # Must run from the go module root: `go generate` can't drive it because
 # it cd's into the package dir, which has no go.mod.
+#
+# DAGNABIT_CEILING_DIRECTORIES bounds dagnabit's upward formatter-config
+# search at the repo root: tap has no on-disk conformist/treefmt config
+# (formatting rides the flake's treefmt-nix), so an unbounded walk
+# escalates to a stray ancestor conformist.toml (an eng-root checkout) —
+# wrong config at best, a hard failure via eng's cwd-guarded conformist
+# wrapper at worst. Bounded, the facade-format pass is a documented no-op
+# and `nix fmt` remains the tree's formatter.
 build-facades:
-    {{cmd_nix_dev}} bash -c 'cd go && dagnabit export'
+    {{cmd_nix_dev}} bash -c 'cd go && DAGNABIT_CEILING_DIRECTORIES="$(git rev-parse --show-toplevel)" dagnabit export'
 
 test: test-go test-rust test-bats
 

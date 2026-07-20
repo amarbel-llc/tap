@@ -1,10 +1,10 @@
-module github.com/amarbel-llc/tap/go
+module code.linenisgreat.com/tap/go
 
 go 1.26
 
 require (
-	github.com/amarbel-llc/purse-first/libs/dewey v0.1.8
-	github.com/amarbel-llc/purse-first/libs/go-mcp v0.0.9
+	code.linenisgreat.com/purse-first/libs/dewey v0.5.0
+	code.linenisgreat.com/purse-first/libs/go-mcp v0.5.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/muesli/termenv v0.16.0
 	golang.org/x/text v0.36.0

@@ -2,7 +2,7 @@
 
 package reformat
 
-import internal "github.com/amarbel-llc/tap/go/internal/alfa/reformat"
+import internal "code.linenisgreat.com/tap/go/internal/alfa/reformat"
 
 // ReformatTAP reads raw TAP (with or without a version line) from r and
 // re-emits it as TAP version 14 on w. When color is true, ok/not ok/skip/

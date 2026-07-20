@@ -2,7 +2,7 @@
 
 package ndjson
 
-import internal "github.com/amarbel-llc/tap/go/internal/bravo/ndjson"
+import internal "code.linenisgreat.com/tap/go/internal/bravo/ndjson"
 
 // Aggregator builds NDJSON records from reader events.
 //

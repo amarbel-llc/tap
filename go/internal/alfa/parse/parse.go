@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/amarbel-llc/tap/go/internal/0/classify"
-	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
+	"code.linenisgreat.com/tap/go/internal/0/classify"
+	"code.linenisgreat.com/tap/go/internal/0/diagnostic"
 )
 
 func ParsePlan(line string) (diagnostic.PlanResult, error) {

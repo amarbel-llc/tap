@@ -265,7 +265,7 @@ Append to `ndjson_test.go`:
 
 ```go
 import (
-	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
+	"code.linenisgreat.com/tap/go/internal/0/diagnostic"
 )
 
 func TestAggregatorRoutesOkAndNotOk(t *testing.T) {
@@ -312,7 +312,7 @@ Expected: build failure — `undefined: NewAggregator`.
 Append to `ndjson.go`:
 
 ```go
-import "github.com/amarbel-llc/tap/go/internal/0/diagnostic"
+import "code.linenisgreat.com/tap/go/internal/0/diagnostic"
 
 // Aggregator builds NDJSON records from reader events.
 //
@@ -801,9 +801,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
-	"github.com/amarbel-llc/tap/go/internal/bravo/ndjson"
-	"github.com/amarbel-llc/tap/go/internal/bravo/reader"
+	"code.linenisgreat.com/tap/go/internal/0/diagnostic"
+	"code.linenisgreat.com/tap/go/internal/bravo/ndjson"
+	"code.linenisgreat.com/tap/go/internal/bravo/reader"
 )
 
 func runReader(t *testing.T, input string) ndjson.Output {
@@ -1165,7 +1165,7 @@ If `go generate` doesn't produce the file, fall back to writing it by hand:
 
 package ndjson
 
-import internal "github.com/amarbel-llc/tap/go/internal/bravo/ndjson"
+import internal "code.linenisgreat.com/tap/go/internal/bravo/ndjson"
 
 type (
 	Aggregator        = internal.Aggregator
@@ -1228,7 +1228,7 @@ Append to `main.go`:
 
 ```go
 import (
-	"github.com/amarbel-llc/tap/go/pkgs/ndjson"
+	"code.linenisgreat.com/tap/go/pkgs/ndjson"
 )
 
 func handleFormatNDJSON(ctx context.Context, args json.RawMessage) error {

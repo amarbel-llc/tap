@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/amarbel-llc/tap/go/internal/0/classify"
+	"code.linenisgreat.com/tap/go/internal/0/classify"
 )
 
 // YAMLDiagnostic models the YAML Diagnostic block under a TAP-14 Test Point

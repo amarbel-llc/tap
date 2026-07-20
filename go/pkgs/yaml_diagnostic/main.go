@@ -2,7 +2,7 @@
 
 package yaml_diagnostic
 
-import internal "github.com/amarbel-llc/tap/go/internal/alfa/yaml_diagnostic"
+import internal "code.linenisgreat.com/tap/go/internal/alfa/yaml_diagnostic"
 
 // YAMLDiagnostic models the YAML Diagnostic block under a TAP-14 Test Point
 // (see TAP-14 spec §"YAML Diagnostics").

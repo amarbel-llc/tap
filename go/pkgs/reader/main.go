@@ -2,7 +2,7 @@
 
 package reader
 
-import internal "github.com/amarbel-llc/tap/go/internal/bravo/reader"
+import internal "code.linenisgreat.com/tap/go/internal/bravo/reader"
 
 // Reader is a streaming TAP-14 parser and validator.
 type Reader = internal.Reader

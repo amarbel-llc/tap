@@ -2,7 +2,7 @@
 
 package exec_parallel
 
-import internal "github.com/amarbel-llc/tap/go/internal/delta/exec_parallel"
+import internal "code.linenisgreat.com/tap/go/internal/delta/exec_parallel"
 
 // ConvertExecParallelWithStatus runs commands via the executor and writes TAP-14
 // output with a tty-build-last-line status line.

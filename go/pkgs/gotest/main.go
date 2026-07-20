@@ -2,7 +2,7 @@
 
 package gotest
 
-import internal "github.com/amarbel-llc/tap/go/internal/charlie/gotest"
+import internal "code.linenisgreat.com/tap/go/internal/charlie/gotest"
 
 // ConvertGoTest reads go test -json events from r and writes TAP-14 to w.
 // If verbose is true, passing tests include output diagnostics.

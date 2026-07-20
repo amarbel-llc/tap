@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/tap/go/internal/bravo/ndjson"
-	"github.com/amarbel-llc/tap/go/internal/bravo/reader"
+	"code.linenisgreat.com/tap/go/internal/bravo/ndjson"
+	"code.linenisgreat.com/tap/go/internal/bravo/reader"
 )
 
 func runReader(t *testing.T, input string) ndjson.Output {

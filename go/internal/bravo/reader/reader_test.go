@@ -9,8 +9,8 @@ import (
 
 	"golang.org/x/text/language"
 
-	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
-	"github.com/amarbel-llc/tap/go/internal/bravo/writer"
+	"code.linenisgreat.com/tap/go/internal/0/diagnostic"
+	"code.linenisgreat.com/tap/go/internal/bravo/writer"
 )
 
 func collectEvents(input string) ([]diagnostic.Event, []diagnostic.Diagnostic, diagnostic.Summary) {

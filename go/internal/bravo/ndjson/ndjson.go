@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
+	"code.linenisgreat.com/tap/go/internal/0/diagnostic"
 )
 
 //go:generate dagnabit export

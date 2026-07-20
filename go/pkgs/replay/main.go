@@ -2,7 +2,7 @@
 
 package replay
 
-import internal "github.com/amarbel-llc/tap/go/internal/charlie/replay"
+import internal "code.linenisgreat.com/tap/go/internal/charlie/replay"
 
 // Replay parses a TAP-14 stream from r and re-emits it onto tw, preserving
 // test points (with directives), comments, bail outs, and YAML diagnostics.

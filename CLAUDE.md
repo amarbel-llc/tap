@@ -26,6 +26,6 @@ just test-bats      # BATS, requires built tap-dancer CLI
 
 ## Code Style
 
-- Go: `gofumpt`, package name `tap`, module `github.com/amarbel-llc/tap/go`
+- Go: `gofumpt`, package name `tap`, module `code.linenisgreat.com/tap/go`
 - Rust: `cargo fmt` + `cargo clippy`, crate name `tap-dancer`
 - All langs: `nix fmt` (treefmt-nix → goimports + gofumpt + rustfmt + nixfmt + shfmt). Also gated by `nix flake check`'s `formatting` check.

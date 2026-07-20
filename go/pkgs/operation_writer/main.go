@@ -2,7 +2,7 @@
 
 package operation_writer
 
-import internal "github.com/amarbel-llc/tap/go/internal/charlie/operation_writer"
+import internal "code.linenisgreat.com/tap/go/internal/charlie/operation_writer"
 
 // OperationWriter bridges operation.Writer to tap-dancer's Writer,
 // converting operation lifecycle events into TAP-14 test output.

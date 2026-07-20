@@ -11,7 +11,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/amarbel-llc/tap/go/internal/0/style"
+	"code.linenisgreat.com/tap/go/internal/0/style"
 )
 
 var (

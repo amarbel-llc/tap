@@ -5,10 +5,10 @@ package operation_writer
 import (
 	"fmt"
 
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/operation"
+	"code.linenisgreat.com/purse-first/libs/go-mcp/operation"
 
-	"github.com/amarbel-llc/tap/go/internal/alfa/yaml_diagnostic"
-	"github.com/amarbel-llc/tap/go/internal/bravo/writer"
+	"code.linenisgreat.com/tap/go/internal/alfa/yaml_diagnostic"
+	"code.linenisgreat.com/tap/go/internal/bravo/writer"
 )
 
 var _ operation.Writer = (*OperationWriter)(nil)

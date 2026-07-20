@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/tap/go/internal/0/style"
-	"github.com/amarbel-llc/tap/go/internal/bravo/reader"
+	"code.linenisgreat.com/tap/go/internal/0/style"
+	"code.linenisgreat.com/tap/go/internal/bravo/reader"
 )
 
 func TestReformatTAPAddsVersionHeader(t *testing.T) {

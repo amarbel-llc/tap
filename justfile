@@ -100,7 +100,7 @@ release version:
     fi
     tag="v{{version}}"
     # Subpath-prefixed tag for the Go module at go/. Required so
-    # `go get github.com/amarbel-llc/tap/go@latest` resolves to a real
+    # `go get code.linenisgreat.com/tap/go@latest` resolves to a real
     # semver instead of a v0.0.0-<date>-<sha> pseudo-version.
     go_tag="go/$tag"
 

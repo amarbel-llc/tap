@@ -11,8 +11,8 @@ import (
 
 	"golang.org/x/text/language"
 
-	"github.com/amarbel-llc/tap/go/internal/alfa/yaml_diagnostic"
-	"github.com/amarbel-llc/tap/go/internal/bravo/reader"
+	"code.linenisgreat.com/tap/go/internal/alfa/yaml_diagnostic"
+	"code.linenisgreat.com/tap/go/internal/bravo/reader"
 )
 
 func TestNewWriterEmitsVersionHeader(t *testing.T) {

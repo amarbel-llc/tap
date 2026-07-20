@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/operation"
+	"code.linenisgreat.com/purse-first/libs/go-mcp/operation"
 
-	"github.com/amarbel-llc/tap/go/internal/bravo/writer"
+	"code.linenisgreat.com/tap/go/internal/bravo/writer"
 )
 
 func TestOperationWriterLeafSuccess(t *testing.T) {

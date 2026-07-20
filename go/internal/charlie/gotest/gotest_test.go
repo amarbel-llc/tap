@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/tap/go/internal/bravo/reader"
+	"code.linenisgreat.com/tap/go/internal/bravo/reader"
 )
 
 func TestConvertSinglePackageAllPass(t *testing.T) {

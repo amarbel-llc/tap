@@ -2,7 +2,7 @@
 
 package diagnostic
 
-import internal "github.com/amarbel-llc/tap/go/internal/0/diagnostic"
+import internal "code.linenisgreat.com/tap/go/internal/0/diagnostic"
 
 // BailOutResult holds parsed data from a bail out line.
 type BailOutResult = internal.BailOutResult

@@ -3,7 +3,7 @@ package parse
 import (
 	"testing"
 
-	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
+	"code.linenisgreat.com/tap/go/internal/0/diagnostic"
 )
 
 func TestParsePlan(t *testing.T) {

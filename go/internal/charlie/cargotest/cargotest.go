@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/amarbel-llc/tap/go/internal/bravo/writer"
+	"code.linenisgreat.com/tap/go/internal/bravo/writer"
 )
 
 type cargoTestResult struct {

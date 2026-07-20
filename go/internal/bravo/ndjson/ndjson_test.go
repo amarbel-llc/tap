@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
+	"code.linenisgreat.com/tap/go/internal/0/diagnostic"
 )
 
 func TestTestRecordMarshalsRequiredFields(t *testing.T) {

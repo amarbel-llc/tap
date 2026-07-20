@@ -2,7 +2,7 @@
 
 package cargotest
 
-import internal "github.com/amarbel-llc/tap/go/internal/charlie/cargotest"
+import internal "code.linenisgreat.com/tap/go/internal/charlie/cargotest"
 
 // ConvertCargoTest reads cargo test pretty output from r and writes TAP-14 to w.
 // If verbose is true, passing tests include output diagnostics.

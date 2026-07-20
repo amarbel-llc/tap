@@ -15,10 +15,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/amarbel-llc/tap/go/internal/0/style"
-	"github.com/amarbel-llc/tap/go/internal/alfa/yaml_diagnostic"
-	"github.com/amarbel-llc/tap/go/internal/bravo/writer"
-	"github.com/amarbel-llc/tap/go/internal/charlie/replay"
+	"code.linenisgreat.com/tap/go/internal/0/style"
+	"code.linenisgreat.com/tap/go/internal/alfa/yaml_diagnostic"
+	"code.linenisgreat.com/tap/go/internal/bravo/writer"
+	"code.linenisgreat.com/tap/go/internal/charlie/replay"
 )
 
 // ExecResult holds the outcome of a single parallel command execution.

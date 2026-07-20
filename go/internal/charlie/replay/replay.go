@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
-	"github.com/amarbel-llc/tap/go/internal/alfa/yaml_diagnostic"
-	"github.com/amarbel-llc/tap/go/internal/bravo/reader"
-	"github.com/amarbel-llc/tap/go/internal/bravo/writer"
+	"code.linenisgreat.com/tap/go/internal/0/diagnostic"
+	"code.linenisgreat.com/tap/go/internal/alfa/yaml_diagnostic"
+	"code.linenisgreat.com/tap/go/internal/bravo/reader"
+	"code.linenisgreat.com/tap/go/internal/bravo/writer"
 )
 
 // Replay parses a TAP-14 stream from r and re-emits it onto tw, preserving

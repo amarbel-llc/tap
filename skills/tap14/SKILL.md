@@ -18,8 +18,8 @@ Use TAP-14 output when building:
 
 ## Go Library
 
-Module: `github.com/amarbel-llc/tap/go`
-Public package: `github.com/amarbel-llc/tap/go/pkgs/writer` (other consumer-facing packages live alongside under `pkgs/`: `reader`, `replay`, `reformat`, `ndjson`, `gotest`, `cargotest`, `diagnostic`, `yaml_diagnostic`).
+Module: `code.linenisgreat.com/tap/go`
+Public package: `code.linenisgreat.com/tap/go/pkgs/writer` (other consumer-facing packages live alongside under `pkgs/`: `reader`, `replay`, `reformat`, `ndjson`, `gotest`, `cargotest`, `diagnostic`, `yaml_diagnostic`).
 
 ### Basic Usage
 
@@ -27,7 +27,7 @@ Public package: `github.com/amarbel-llc/tap/go/pkgs/writer` (other consumer-faci
 import (
     "os"
 
-    "github.com/amarbel-llc/tap/go/pkgs/writer"
+    "code.linenisgreat.com/tap/go/pkgs/writer"
 )
 
 func main() {

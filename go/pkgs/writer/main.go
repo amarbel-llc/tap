@@ -2,7 +2,7 @@
 
 package writer
 
-import internal "github.com/amarbel-llc/tap/go/internal/bravo/writer"
+import internal "code.linenisgreat.com/tap/go/internal/bravo/writer"
 
 // OutputBlockWriter writes indented body lines inside an Output Block.
 // The "# Output:" header is emitted lazily on the first Line call, so a

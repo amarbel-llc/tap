@@ -13,19 +13,19 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/command"
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
-	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ui"
+	"code.linenisgreat.com/purse-first/libs/go-mcp/command"
+	"code.linenisgreat.com/purse-first/libs/go-mcp/server"
+	"code.linenisgreat.com/purse-first/libs/go-mcp/transport"
 
-	"github.com/amarbel-llc/tap/go/pkgs/cargotest"
-	"github.com/amarbel-llc/tap/go/pkgs/diagnostic"
-	"github.com/amarbel-llc/tap/go/pkgs/exec_parallel"
-	"github.com/amarbel-llc/tap/go/pkgs/gotest"
-	"github.com/amarbel-llc/tap/go/pkgs/ndjson"
-	"github.com/amarbel-llc/tap/go/pkgs/reader"
-	"github.com/amarbel-llc/tap/go/pkgs/reformat"
-	"github.com/amarbel-llc/tap/go/pkgs/writer"
+	"code.linenisgreat.com/tap/go/pkgs/cargotest"
+	"code.linenisgreat.com/tap/go/pkgs/diagnostic"
+	"code.linenisgreat.com/tap/go/pkgs/exec_parallel"
+	"code.linenisgreat.com/tap/go/pkgs/gotest"
+	"code.linenisgreat.com/tap/go/pkgs/ndjson"
+	"code.linenisgreat.com/tap/go/pkgs/reader"
+	"code.linenisgreat.com/tap/go/pkgs/reformat"
+	"code.linenisgreat.com/tap/go/pkgs/writer"
 )
 
 func main() {

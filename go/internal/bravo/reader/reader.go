@@ -13,9 +13,9 @@ import (
 	"golang.org/x/text/message"
 	"gopkg.in/yaml.v3"
 
-	"github.com/amarbel-llc/tap/go/internal/0/classify"
-	"github.com/amarbel-llc/tap/go/internal/0/diagnostic"
-	"github.com/amarbel-llc/tap/go/internal/alfa/parse"
+	"code.linenisgreat.com/tap/go/internal/0/classify"
+	"code.linenisgreat.com/tap/go/internal/0/diagnostic"
+	"code.linenisgreat.com/tap/go/internal/alfa/parse"
 )
 
 type readerState int

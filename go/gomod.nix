@@ -31,7 +31,7 @@ let
     GOTOOLCHAIN = "local";
     meta = with pkgs.lib; {
       description = "TAP-14 validator and writer toolkit";
-      homepage = "https://github.com/amarbel-llc/tap";
+      homepage = "https://code.linenisgreat.com/tap";
       license = licenses.mit;
     };
   };

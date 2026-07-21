@@ -4,7 +4,7 @@
   inputs = {
     # amarbel-llc fork of nixpkgs. The overlay (`overlays.default`) adds
     # gomod2nix's buildGoApplication / mkGoEnv on top of upstream.
-    igloo.url = "github:amarbel-llc/igloo";
+    igloo.url = "https://code.linenisgreat.com/igloo/archive/master.tar.gz";
 
     # Master nixpkgs pinned for the devshell's Go tooling
     # (gofumpt/gopls/golangci-lint). Go itself comes from the fork's
@@ -20,7 +20,7 @@
 
     # gomod2nix (devshell tool — generates go/gomod2nix.toml).
     gomod2nix = {
-      url = "github:amarbel-llc/gomod2nix";
+      url = "https://code.linenisgreat.com/gomod2nix/archive/master.tar.gz";
     };
 
     # Rust build (crane) + stable toolchain (rust-overlay).
@@ -36,7 +36,7 @@
     # in `bats.nix`. Note: amarbel-llc/bats has a `tap` input, but its
     # `bats-libs` output does not consume it — no circular dependency.
     bats = {
-      url = "github:amarbel-llc/bats";
+      url = "https://code.linenisgreat.com/bats/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -46,7 +46,7 @@
     # `//go:generate dagnabit export` directives that produce the
     # go/pkgs/* re-export shims. Devshell-only; not a build dependency.
     purse-first = {
-      url = "github:amarbel-llc/purse-first";
+      url = "https://code.linenisgreat.com/purse-first/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -55,7 +55,6 @@
     utils.inputs.systems.follows = "igloo/systems";
     gomod2nix.inputs.nixpkgs-master.follows = "nixpkgs-master";
     igloo.inputs.nixpkgs-master.follows = "nixpkgs-master";
-    bats.inputs.treefmt-nix.follows = "treefmt-nix";
     igloo.inputs.treefmt-nix.follows = "treefmt-nix";
     gomod2nix.inputs.flake-utils.follows = "utils";
   };

@@ -2,7 +2,7 @@ cmd_nix_dev := "nix develop " + justfile_directory() + " --command "
 
 default: build test
 
-# Build all impls (default = symlinkJoin of cli + rust + bash)
+# build all impls (default = symlinkJoin of cli + rust + bash)
 build:
     nix build
 
@@ -25,7 +25,7 @@ build-rust:
 build-bash:
     nix build .#tap-dancer-bash
 
-# Compile the scdoc section-7 manpages (tap-ndjson(7), etc.)
+# compile the scdoc section-7 manpages (tap-ndjson(7), etc.)
 build-doc:
     nix build .#tap-dancer-doc
 
@@ -54,7 +54,10 @@ test-go:
 test-rust:
     {{cmd_nix_dev}} bash -c 'cd rust && cargo test'
 
-# Requires built CLI on disk at result/bin/tap-dancer
+# Requires built CLI on disk at result/bin/tap-dancer; the `build`
+# dependency puts it there.
+#
+# run the bats suite in the devshell against the built CLI
 test-bats: build
     TAP_DANCER_BIN=$PWD/result/bin/tap-dancer \
     TAP_DANCER_LIB=$PWD/result/share/tap-dancer/lib \
@@ -84,7 +87,7 @@ lint:
     {{cmd_nix_dev}} bash -c 'cd go && go vet ./...'
     {{cmd_nix_dev}} bash -c 'cd rust && cargo clippy'
 
-# Re-pin flake inputs
+# re-pin flake inputs
 update:
     nix flake update
 

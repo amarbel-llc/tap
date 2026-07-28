@@ -11,6 +11,8 @@ build:
 # go-pkgs/derivation class — see #23, nixpkgs#38/#44) and lane
 # breakage (e.g. #26 — bats-default failing at eval) are caught before
 # merge instead of after the fact.
+#
+# build the default package and run `nix flake check`
 build-nix: build
     nix flake check
 
@@ -39,6 +41,8 @@ build-doc:
 # wrong config at best, a hard failure via eng's cwd-guarded conformist
 # wrapper at worst. Bounded, the facade-format pass is a documented no-op
 # and `nix fmt` remains the tree's formatter.
+#
+# regenerate the go/pkgs/* re-export facades via dagnabit
 build-facades:
     {{cmd_nix_dev}} bash -c 'cd go && DAGNABIT_CEILING_DIRECTORIES="$(git rev-parse --show-toplevel)" dagnabit export'
 
@@ -60,12 +64,16 @@ test-bats: build
 # code path `nix flake check` exercises — staged, hermetic, runs
 # against a freshly built tap-dancer. Slower than `test-bats` but
 # proves a clean rebuild still passes the suite.
+#
+# run the bats suite as a nix derivation (bats-default lane)
 test-bats-default:
     nix build .#bats-default --print-build-logs --no-link
 
 # Run a tag-filtered bats lane. Lanes are auto-generated from
 # `# bats file_tags=` directives in zz-tests_bats/*.bats; `nix flake
 # show` lists what's currently available.
+#
+# run a tag-filtered bats lane
 test-bats-tags *tags:
     nix build --print-build-logs --no-link .#bats-{{tags}}
 
@@ -91,6 +99,8 @@ clean:
 #   - the working tree is dirty
 #   - the tag already exists locally
 #   - HEAD does not contain origin/master (would push un-merged work)
+#
+# cut a release: bump version everywhere, test, tag, push, publish
 release version:
     #!/usr/bin/env bash
     set -euo pipefail

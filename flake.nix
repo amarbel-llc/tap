@@ -52,6 +52,7 @@
       inputs.utils.follows = "utils";
       inputs.gomod2nix.follows = "gomod2nix";
     };
+    purse-first.inputs.conformist.follows = "bats/conformist";
     utils.inputs.systems.follows = "igloo/systems";
     gomod2nix.inputs.nixpkgs-master.follows = "nixpkgs-master";
     igloo.inputs.nixpkgs-master.follows = "nixpkgs-master";

@@ -10,7 +10,7 @@
     # (gofumpt/gopls/golangci-lint). Go itself comes from the fork's
     # `pkgs.go_1_26` (1.26.3); nixpkgs-master can be dropped once the
     # fork's master tracks an equivalent set of Go tools.
-    nixpkgs-master.url = "github:NixOS/nixpkgs/7a0f122f5090cf4c2ade2a13a0e229d4e19ba71f";
+    nixpkgs-master.url = "github:NixOS/nixpkgs/b4fd65b198c599cbe814fcb9f42d25d021595ec9";
 
     utils.url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
 

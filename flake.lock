@@ -14,11 +14,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793707203,
-        "narHash": "sha256-wxGxE6iBdX9kGagI8QlH0UCFAMbPOnhuIgOGIExZrRk=",
-        "rev": "f471d7fc5dc75187064576216086d421c5edb348",
+        "lastModified": 1794003574,
+        "narHash": "sha256-SgMhtFgqb6a+kVQ7Zr1zDy3sc1Q+j73g+cmLmOr9myQ=",
+        "rev": "c58195b7a164e9e09c69b50d7368a1b07d97a40e",
         "type": "tarball",
-        "url": "https://code.linenisgreat.com/bats/archive/f471d7fc5dc75187064576216086d421c5edb348.tar.gz"
+        "url": "https://code.linenisgreat.com/bats/archive/c58195b7a164e9e09c69b50d7368a1b07d97a40e.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -74,11 +74,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793673491,
-        "narHash": "sha256-TOI8ghlIWeruvrc+52k+99DOwe9Aez4YTw+bGkNVANs=",
-        "rev": "883570e9d439e5053037843bebfd6ea62f49e980",
+        "lastModified": 1793751368,
+        "narHash": "sha256-OIp0I4mimULRq4tJ0gQFUFv0QZ5bW6wVnyP3ZC0U1xs=",
+        "rev": "a1f3d9c24f6cd741d010c841a7ac2d0634fde998",
         "type": "tarball",
-        "url": "https://code.linenisgreat.com/conformist/archive/883570e9d439e5053037843bebfd6ea62f49e980.tar.gz"
+        "url": "https://code.linenisgreat.com/conformist/archive/a1f3d9c24f6cd741d010c841a7ac2d0634fde998.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -202,11 +202,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793706532,
-        "narHash": "sha256-DPO2Ae6U6CZ1+atKNE3DgrkRH5VaN/RLTr2lJym1vSo=",
-        "rev": "08928c4abed3c66eedf43292110773a668031d49",
+        "lastModified": 1794001546,
+        "narHash": "sha256-wy+N9vnGUR8gPhlz7xGRrmx/wbBmTuaOZNArK62qj0Y=",
+        "rev": "655a79e7d59f70fd477ae4a643925fcfd7099e92",
         "type": "tarball",
-        "url": "https://code.linenisgreat.com/purse-first/archive/08928c4abed3c66eedf43292110773a668031d49.tar.gz"
+        "url": "https://code.linenisgreat.com/purse-first/archive/655a79e7d59f70fd477ae4a643925fcfd7099e92.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -233,11 +233,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793870170,
-        "narHash": "sha256-0psEeQjs1g9oWQ6eVVGlCom+X3/uHyr6jSMyHVU57u8=",
+        "lastModified": 1793956102,
+        "narHash": "sha256-dASUovwB3DUoTm6daga0hsNZZAFCCGlUS4FPBjK0OwA=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "19e0e6c951a7a8a7d3232c64e58d26b89df44c60",
+        "rev": "74cebce67ef6671ea48fda353a5be2d229bd2920",
         "type": "github"
       },
       "original": {
